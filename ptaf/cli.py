@@ -336,7 +336,7 @@ def dashboard(host, port, demo, fleet_dir, token, export_path) -> None:
     if export_path:
         summary = dash.demo_summary() if demo else dash.build_summary()
         fleet = dash.demo_fleet() if demo else (load_fleet(fleet_dir) if fleet_dir else None)
-        export_path.write_text(dash.render_html(summary, fleet), encoding="utf-8")
+        export_path.write_text(dash.render_html(summary, fleet, static=True), encoding="utf-8")
         click.echo(f"Wrote {export_path}")
         return
     if host not in ("127.0.0.1", "localhost", "::1") and not token:

@@ -211,22 +211,31 @@ function h(tag, cls, ...kids) {
 function svg(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 function when(iso) { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString(); }
+// "Now" for age calculations. Demo data is frozen at its generation time so a shared demo stays
+// internally consistent forever; real data is always measured against the real clock.
+function NOW() { return (typeof S !== "undefined" && S && S.demo) ? Date.parse(S.generated) : Date.now(); }
+// Returns a complete phrase: "just now", "5 minutes ago"; with future=true: "now", "in 45 minutes".
 function ago(iso, future) {
   const t = Date.parse(iso); if (!isFinite(t)) return "unknown";
-  let s = (Date.now() - t) / 1000; if (future) s = -s;
-  if (s < 0) return future ? "any moment" : "just now";
+  let sec = (NOW() - t) / 1000; if (future) sec = -sec;
+  if (sec < 0) return future ? "now" : "just now";
   const r = (n, u) => n + " " + u + (n === 1 ? "" : "s");
-  if (s < 90) return future ? "under a minute" : "just now";
-  if (s < 5400) return r(Math.round(s / 60), "minute");
-  if (s < 129600) return r(Math.round(s / 3600), "hour");
-  return r(Math.round(s / 86400), "day");
+  let span;
+  if (sec < 90) { if (!future) return "just now"; span = "under a minute"; }
+  else if (sec < 5400) span = r(Math.round(sec / 60), "minute");
+  else if (sec < 129600) span = r(Math.round(sec / 3600), "hour");
+  else span = r(Math.round(sec / 86400), "day");
+  return future ? "in " + span : span + " ago";
 }
 function dur(sec) { if (sec == null) return "n/a"; const m = Math.floor(sec / 60); return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + (m % 60) + " min"; }
 
 let DATA = JSON.parse($("boot").textContent);
 let S = DATA.summary || null, F = DATA.fleet || null;
 const TOKEN = new URLSearchParams(location.hash.slice(1)).get("token");
-const LIVE = location.protocol.startsWith("http");
+// A snapshot (ptaf dashboard --export) is a fixed picture: it must never poll a server, even if
+// someone hosts the file on an intranet web server, where it would otherwise show a false
+// "cannot reach the dashboard server" banner.
+const LIVE = location.protocol.startsWith("http") && !DATA.static;
 let lastOk = Date.now(), flSort = { key: "name", dir: 1 }, selected = null;
 
 function api(path) {
@@ -262,7 +271,7 @@ function render() {
 
   let v, l;
   if (!latest) { v = "No results yet"; l = "Run “ptaf selftest” (or start “ptaf monitor”) and this page will fill in."; }
-  else if (health === "offline" || health === "never") { v = "The agent is not running."; l = "The numbers below are from the last check (" + ago(latest.started) + " ago). Nothing is being verified right now."; }
+  else if (health === "offline" || health === "never") { v = "The agent is not running."; l = "The numbers below are from the last check (" + ago(latest.started) + "). Nothing is being verified right now."; }
   else if (gaps.length) { v = gaps.length + " of " + tested.length + " tested attacker behaviors went undetected."; l = "These are real holes: we safely imitated the behavior and nothing alerted. Details and fixes are below."; }
   else if (blind.length) { v = "No gaps found, but " + blind.length + " check" + (blind.length > 1 ? "s" : "") + " could not be verified."; l = "Everything we could test was caught. The rest needs a working sensor on this machine."; }
   else { v = "All " + tested.length + " tested attacker behaviors were detected."; l = "Your detections fired on every safe test, and the agent keeps re-checking so a silent failure cannot hide."; }
@@ -279,7 +288,7 @@ function render() {
   const kpi = (l, val, sub) => k.appendChild(h("div", "card kpi", h("div", "l", l), h("div", "v", val), h("div", "sub", sub)));
   kpi("Verified coverage", cov == null ? "n/a" : cov + "%", tested.length + " tested · " + results.length + " checks");
   kpi("Agent", { online: "Online", stale: "Late", offline: "Offline", never: "Not running" }[health], a.uptime_s != null ? "up " + dur(a.uptime_s) + (a.version ? " · v" + a.version : "") : "no heartbeat");
-  kpi("Last check", latest ? ago(latest.started) + " ago" : "never", a.next_selftest && health !== "offline" ? "next in " + ago(a.next_selftest, true) : "—");
+  kpi("Last check", latest ? ago(latest.started) : "never", a.next_selftest && health !== "offline" ? "next check " + ago(a.next_selftest, true) : "—");
   kpi("Real alerts, 24 h", String((S.alert_counts || {}).real_24h || 0), ((S.alert_counts || {}).synthetic_24h || 0) + " from safe tests");
   kpi("Sensor", col.name || (latest && latest.sensor ? latest.sensor.name : "n/a"), vis ? vis.detail : (col.errors ? col.errors + " error(s)" : "no errors"));
 
@@ -347,7 +356,7 @@ function render() {
   renderChecks(S.health_checks);
   renderAlerts();
 
-  $("foot").textContent = "Generated " + ago(S.generated) + " ago · PTAF Sentinel v" + (S.version || "") + " · read-only · no data leaves this machine";
+  $("foot").textContent = "Generated " + ago(S.generated) + " · PTAF Sentinel v" + (S.version || "") + " · read-only · no data leaves this machine";
   renderFleet();
 }
 function EXPLAIN_LABEL(s) { return ((S.explain || {})[s] || {}).label || (s || "not run"); }
@@ -355,7 +364,7 @@ function EXPLAIN_LABEL(s) { return ((S.explain || {})[s] || {}).label || (s || "
 function renderChecks(hc) {
   const box = $("checks"); clear(box);
   if (!hc || !hc.checks) { box.appendChild(h("span", "empty", "No health check yet. Press “Run health check”.")); return; }
-  $("doctor-when").textContent = "Last run " + ago(hc.time) + " ago";
+  $("doctor-when").textContent = "Last run " + ago(hc.time);
   hc.checks.forEach((c) => box.appendChild(h("div", null, h("span", "tag s-" + (c.status === "ok" ? "detected" : c.status === "warn" ? "warning" : "critical"), c.status === "ok" ? "OK" : c.status.toUpperCase()), h("div", null, h("b", null, c.name), h("div", "sub", c.detail), c.fix && c.status !== "ok" ? h("div", "sub", "Fix: " + c.fix) : null))));
 }
 
@@ -387,7 +396,7 @@ function renderFleet() {
   const rows = F.hosts.filter((x) => (!q || (x.name + " " + x.os + " " + x.virtualization).toLowerCase().includes(q)) && (!hf || x.health === hf) && (!og || x.gaps > 0))
     .sort((p, q2) => { const a1 = p[flSort.key], b1 = q2[flSort.key]; return (a1 == null ? -1 : b1 == null ? 1 : a1 < b1 ? -1 : a1 > b1 ? 1 : 0) * flSort.dir; });
   const body = $("fl-body"); clear(body);
-  rows.forEach((x) => body.appendChild(h("tr", null, h("td", "mono", x.name), h("td", null, x.os), h("td", null, x.virtualization === "none" ? "bare metal" : x.virtualization), h("td", null, x.coverage == null ? "n/a" : x.coverage + "%"), h("td", null, h("span", "tag " + (x.gaps ? "s-missed" : "s-detected"), String(x.gaps))), h("td", null, String(x.blind)), h("td", null, h("span", "tag s-" + x.health, x.health)), h("td", "sub", ago(new Date(Date.now() - x.age_s * 1000).toISOString()) + " ago"))));
+  rows.forEach((x) => body.appendChild(h("tr", null, h("td", "mono", x.name), h("td", null, x.os), h("td", null, x.virtualization === "none" ? "bare metal" : x.virtualization), h("td", null, x.coverage == null ? "n/a" : x.coverage + "%"), h("td", null, h("span", "tag " + (x.gaps ? "s-missed" : "s-detected"), String(x.gaps))), h("td", null, String(x.blind)), h("td", null, h("span", "tag s-" + x.health, x.health)), h("td", "sub", ago(new Date(NOW() - x.age_s * 1000).toISOString())))));
   if (!rows.length) body.appendChild(h("tr", null, h("td", "empty", "No machines match.")));
   const mb = $("fl-matrix"); clear(mb);
   F.matrix.slice().sort((p, q2) => (q2.missed - p.missed) || p.technique_id.localeCompare(q2.technique_id)).forEach((c) => mb.appendChild(h("tr", null, h("td", "mono", c.technique_id), h("td", null, String(c.hosts)), h("td", null, String(c.detected)), h("td", null, h("span", "tag " + (c.missed ? "s-missed" : "s-detected"), String(c.missed))), h("td", null, String(c.blind)), h("td", null, h("span", "tag s-" + (c.status === "detected" ? "detected" : c.status === "missed" ? "missed" : "blind"), c.status === "detected" ? "✓ protected" : c.status === "missed" ? "✕ gap" : "! blind")))));
@@ -396,12 +405,12 @@ function renderFleet() {
 function lostBanner(msg) { const b = $("lost"); b.hidden = !msg; b.textContent = msg || ""; }
 function refresh() {
   if (!LIVE) return Promise.resolve();
-  return api("/api/summary").then((s) => { S = s; lastOk = Date.now(); lostBanner(""); return F || DATA.fleet === undefined ? null : null; })
+  return api("/api/summary").then((s) => { S = s; lastOk = Date.now(); lostBanner(""); })
     .then(() => (F || (DATA.auth === true) ? api("/api/fleet").then((f) => { F = f; }).catch(() => {}) : null))
     .then(render)
     .catch((e) => {
       if (e.message === "auth") { lostBanner("Access token required. Open this page using the link that ends in #token=…"); return; }
-      lostBanner("Cannot reach the dashboard server. The data below is from " + ago(new Date(lastOk).toISOString()) + " ago and may be out of date.");
+      lostBanner("Cannot reach the dashboard server. The data below was last updated " + ago(new Date(lastOk).toISOString()) + " and may be out of date.");
     });
 }
 

@@ -26,12 +26,19 @@ ptaf service --os linux   # print a systemd unit / launchd plist / schtasks comm
 
 ## Run it as an application (no Python needed)
 
-`python packaging/build.py` builds a single self-contained `dist/ptaf` for the OS you run it on
-(`dist/ptaf.exe` on Windows). Tagging a release (`v*`) builds Linux, macOS and Windows binaries
-in CI, smoke-tests each with real canaries, and attaches them with SHA-256 checksums.
-Binaries are **not code-signed yet**: macOS Gatekeeper and Windows SmartScreen will warn, so
-verify the checksum, or build from source. Canaries that need an interpreter (the Python one)
-are skipped, never counted as gaps, when none is installed.
+```bash
+python packaging/build.py            # one file:  dist/ptaf        (Linux, Windows)
+python packaging/build.py --onedir   # a folder:  dist/ptaf/ptaf   (macOS: use this)
+```
+
+**Use `--onedir` on macOS.** A one-file build unpacks about 10 MB into a fresh temp folder on every
+launch, and macOS re-scans those newly written unsigned libraries each time. Measured on macOS 14:
+**~14 s for every command, even `--version`**, versus **~0.3 s** for the folder build after its one
+slow first launch. Tagging a release (`v*`) builds Linux, macOS and Windows apps in CI, smoke-tests
+each with real canaries, and attaches them with SHA-256 checksums (macOS ships as a `.tar.gz` folder).
+Binaries are **not code-signed yet**: macOS Gatekeeper and Windows SmartScreen will warn, so verify
+the checksum, or build from source. Canaries that need an interpreter (the Python one) are skipped,
+never counted as gaps, when none is installed.
 
 State and alerts live in `~/.ptaf` (override with `PTAF_HOME`): `alerts.jsonl`,
 `history.jsonl`, `state.json`, `badge.json`, `navigator_layer.json`.
