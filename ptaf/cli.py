@@ -355,6 +355,7 @@ def up(rules_dir, only, skip, collector, host, port, interval, token, no_browser
                 click.echo("  (no browser could be opened here; open the URL above yourself)")
         except webbrowser.Error:
             pass
+    dash.stop_on_signals()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

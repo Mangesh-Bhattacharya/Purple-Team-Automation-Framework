@@ -242,7 +242,16 @@ def attention_items(s: dict[str, Any]) -> list[dict[str, str]]:
             )
 
     if not items:
-        add("ok", "Nothing needs your attention", "The agent is running and every check passed.")
+        if results:
+            add(
+                "ok", "Nothing needs your attention", "The agent is running and every check passed."
+            )
+        else:  # never claim success before a single check has run
+            add(
+                "info",
+                "The first safe tests have not finished yet",
+                "Results appear in roughly 10-20 seconds; this page updates by itself.",
+            )
     items.sort(key=lambda i: LEVEL_ORDER[i["level"]])
     return items
 
@@ -634,6 +643,27 @@ def make_handler(demo: bool = False, fleet_dir: Path | None = None, token: str |
     return Handler
 
 
+def stop_on_signals() -> None:
+    """Turn SIGTERM (systemd, Docker, kill) and SIGINT into a normal clean shutdown.
+
+    A background job started by a non-interactive shell inherits SIGINT as IGNORED, and SIGTERM
+    would otherwise kill the process outright, skipping cleanup (lock, final status). Both are
+    routed to KeyboardInterrupt so the usual ``finally`` blocks run. Main thread only.
+    """
+    import signal
+
+    def _raise(*_: Any) -> None:
+        raise KeyboardInterrupt
+
+    for name in ("SIGINT", "SIGTERM"):
+        sig = getattr(signal, name, None)
+        if sig is not None:
+            try:
+                signal.signal(sig, _raise)
+            except (ValueError, OSError):
+                pass  # not the main thread, or not permitted here
+
+
 def make_server(
     host: str = "127.0.0.1",
     port: int = 8787,
@@ -653,6 +683,7 @@ def serve(
     token: str | None = None,
 ) -> None:
     server = make_server(host, port, demo, fleet_dir, token)
+    stop_on_signals()
     print(
         f"PTAF dashboard on http://{host}:{port}"
         + ("/#token=<your token>" if token else "")

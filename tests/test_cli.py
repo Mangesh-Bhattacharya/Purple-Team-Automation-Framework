@@ -1,6 +1,7 @@
 """CLI contract tests: exit codes, formats, doctor, rule checks, canary listing."""
 
 import json
+import os
 from xml.etree import ElementTree as ET
 
 import pytest
@@ -172,3 +173,43 @@ def test_build_script_can_make_a_folder_build_and_defaults_to_one_file():
     )
     cmd = " ".join(mod.build_command(True))
     assert "ptaf/rules" in cmd and "dashboard.html" in cmd  # the rules still ship in the app
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX signals")
+@pytest.mark.parametrize("how", ["SIGTERM", "SIGINT-ignored-by-parent"])
+def test_up_stops_cleanly_on_sigterm_and_even_when_sigint_was_ignored(tmp_path, how):
+    """systemd/Docker send SIGTERM; a background job from a non-interactive shell ignores SIGINT."""
+    import signal
+    import socket
+    import subprocess
+    import sys
+    import time
+
+    from ptaf.canaries import canaries_for
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    one = canaries_for(collect_host_info().os, sensor="poll")[0].id
+    env = {**os.environ, "PTAF_HOME": str(tmp_path)}
+    ignore_int = how != "SIGTERM"
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "ptaf", "up", "--no-browser", "--port", str(port), "--only", one],
+        env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        preexec_fn=(lambda: signal.signal(signal.SIGINT, signal.SIG_IGN)) if ignore_int else None,
+    )  # fmt: skip
+    try:
+        for _ in range(100):  # wait until it is serving
+            try:
+                socket.create_connection(("127.0.0.1", port), timeout=0.3).close()
+                break
+            except OSError:
+                time.sleep(0.2)
+        proc.send_signal(signal.SIGTERM if how == "SIGTERM" else signal.SIGINT)
+        code = proc.wait(timeout=60)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+    assert code == 0, f"exit {code}"
+    assert not (tmp_path / "monitor.lock").exists()
+    assert json.loads((tmp_path / "status.json").read_text())["state"] == "stopped"
