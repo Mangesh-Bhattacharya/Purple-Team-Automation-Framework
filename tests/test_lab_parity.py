@@ -69,6 +69,9 @@ EVENTS = [
     {"Image": "/usr/bin/ls", "CommandLine": "ls -la"},
     {"Image": "", "CommandLine": ""},
     {"CommandLine": "DYLD_INSERT_LIBRARIES=/x run"},
+    {"Image": "/bin/bash", "CommandLine": "bash -c history -c"},
+    {"Image": "/usr/bin/openssl", "CommandLine": "openssl enc -d -base64"},
+    {"Image": "C:\\Windows\\System32\\systeminfo.exe", "CommandLine": "systeminfo.exe"},
 ]
 
 HAND_RULES = [

@@ -127,6 +127,11 @@
         while (pos < lines.length && lines[pos].n < k) pos++;
         return out.join(rest[0] === ">" ? " " : "\n").trim();
       }
+      // A plain (unquoted, non-flow) scalar may continue on deeper-indented lines; YAML folds them
+      // into one line with single spaces.
+      if (!/^["'\[{]/.test(rest)) {
+        while (pos < lines.length && lines[pos].indent > parentIndent) { rest += " " + lines[pos].text; pos++; }
+      }
       return value(rest);
     }
     function parseMap(indent) {
