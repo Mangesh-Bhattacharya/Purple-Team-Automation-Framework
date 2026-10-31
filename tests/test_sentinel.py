@@ -443,3 +443,47 @@ def test_second_monitor_is_refused_and_stale_lock_is_taken_over(tmp_path, monkey
     assert lock.read_text(encoding="utf-8").strip().isdigit()
     state.release_lock(lock)
     assert not lock.exists()
+
+
+def _scripted(monkeypatch, statuses):
+    from ptaf import validation
+
+    calls = []
+
+    def fake(canary, rules, host, buffer, **kw):
+        calls.append(1)
+        st = statuses[min(len(calls) - 1, len(statuses) - 1)]
+        return CanaryResult(canary.id, canary.technique_id, canary.name, st, detail="sensor gap")
+
+    monkeypatch.setattr(validation, "_run_canary_once", fake)
+    return validation, calls
+
+
+def _event_canary():
+    from ptaf.canaries import CANARIES
+
+    return next(c for c in CANARIES if c.min_sensor == "event")
+
+
+def test_a_lost_race_on_a_millisecond_lived_tool_is_retried_and_reported_honestly(monkeypatch):
+    validation, calls = _scripted(monkeypatch, ["no_telemetry", "no_telemetry", "detected"])
+    res = validation.run_canary(_event_canary(), [], collect_host_info(), EventBuffer())
+    assert res.status == "detected" and len(calls) == 3
+    assert "lost the race" in res.detail  # the flakiness stays visible
+
+
+def test_a_genuinely_blind_sensor_still_reports_blind_after_the_retries(monkeypatch):
+    validation, calls = _scripted(monkeypatch, ["no_telemetry"])
+    res = validation.run_canary(_event_canary(), [], collect_host_info(), EventBuffer())
+    assert res.status == "no_telemetry" and len(calls) == 1 + validation.RACE_RETRIES
+
+
+def test_other_canaries_are_not_retried_on_no_telemetry(monkeypatch):
+    from ptaf.canaries import CANARIES
+
+    validation, calls = _scripted(monkeypatch, ["no_telemetry"])
+    core = next(c for c in CANARIES if c.min_sensor == "any")
+    assert (
+        validation.run_canary(core, [], collect_host_info(), EventBuffer()).status == "no_telemetry"
+    )
+    assert len(calls) == 1  # a sensor that sees nothing for a long-lived canary is a real problem

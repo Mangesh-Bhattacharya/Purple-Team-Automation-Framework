@@ -205,6 +205,9 @@ def _run_canary_once(
     return base
 
 
+RACE_RETRIES = 3  # extra attempts for a lost read-after-event race (see run_canary)
+
+
 def run_canary(
     canary: Canary,
     rules: list[Rule],
@@ -213,23 +216,40 @@ def run_canary(
     retries: int = 1,
     **kwargs: Any,
 ) -> CanaryResult:
-    """Run a canary; re-run a ``missed`` result before believing it.
+    """Run a canary, re-running results that can be a fluke before believing them.
 
-    A genuine detection gap is deterministic and misses every time. A sensor race (a process
-    snapshotted mid-exec under load) does not. If a retry detects the canary we report
-    ``detected`` but say so in ``detail`` so the flakiness is visible, not hidden.
+    * ``missed``: a genuine detection gap is deterministic and misses every time; a sensor race does
+      not. One retry; a retry-only success is reported as ``detected`` with that stated in ``detail``.
+    * ``no_telemetry`` for a canary that needs the event-driven sensor: those tools live only a few
+      milliseconds, and the sensor reads the command line AFTER the kernel announces the exec, so it
+      sometimes loses the race to a process that has already exited (measured: fine for ~30 ms
+      processes, hopeless for ~1 ms ones). The loss is random, so up to ``RACE_RETRIES`` more attempts
+      are made. A sensor that is genuinely blind still ends as ``no_telemetry``: the retries never
+      turn a real gap into a pass, they only stop a coin-flip from raising a false alarm.
     """
     result = _run_canary_once(canary, rules, host, buffer, **kwargs)
-    for _ in range(retries):
-        if result.status != "missed":
+    missed_left = retries
+    race_left = RACE_RETRIES if canary.min_sensor == "event" else 0
+    first_note = ""
+    while result.status != "detected":
+        if result.status == "missed" and missed_left > 0:
+            missed_left -= 1
+        elif result.status == "no_telemetry" and race_left > 0:
+            race_left -= 1
+        else:
             break
-        retry = _run_canary_once(canary, rules, host, buffer, **kwargs)
-        if retry.status == "detected":
-            retry.detail = (
-                "detected only on retry; first attempt missed (possible sensor race). "
-                f"First attempt: {result.detail}"
+        first_note = first_note or result.detail
+        result = _run_canary_once(canary, rules, host, buffer, **kwargs)
+        if result.status == "detected":
+            result.detail = (
+                "detected only on retry; an earlier attempt "
+                + (
+                    "lost the race to a very short-lived process"
+                    if "sensor gap" in first_note
+                    else "missed"
+                )
+                + f". First attempt: {first_note}"
             )
-        result = retry
     return result
 
 
