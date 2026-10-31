@@ -27,12 +27,14 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__, state, status
+from .agents import run_agents
 from .doctor import run_checks
 from .fleet import load_fleet
 from .platform_info import collect_host_info
 from .validation import load_rules
 
 TEMPLATE = Path(__file__).with_name("dashboard.html")
+LAB_JS = Path(__file__).with_name("lab.js")
 
 EXPLAIN = {
     "detected": {
@@ -131,12 +133,39 @@ def build_history_strips(history: list[dict[str, Any]], limit: int = 30) -> list
 
 
 # --- "what needs my attention" --------------------------------------------------------------
+_KIND_RULES = (
+    ("used to be detected", "drift"),
+    ("went undetected", "gap"),
+    ("could not be verified", "blind"),
+    ("overdue", "overdue"),
+    ("agent is not running", "agent"),
+    ("no agent has reported", "agent"),
+    ("heartbeat", "agent"),
+    ("rule files failed", "rules"),
+    ("health check", "health"),
+    ("sensor has been hitting", "sensor"),
+    ("kernel dropped", "sensor"),
+    ("polling sensor", "info"),
+    ("check skipped", "info"),
+    ("nothing needs", "ok"),
+)
+
+
+def item_kind(title: str) -> str:
+    """What sort of finding this is, so the Triage agent can explain its ranking."""
+    low = title.lower()
+    return next((kind for needle, kind in _KIND_RULES if needle in low), "info")
+
+
 def attention_items(s: dict[str, Any]) -> list[dict[str, str]]:
     """Plain-language, prioritised actions. Pure, so snapshots and tests get the same answer."""
     items: list[dict[str, str]] = []
 
     def add(level: str, title: str, detail: str, action: str = "") -> None:
-        items.append({"level": level, "title": title, "detail": detail, "action": action})
+        items.append(
+            {"level": level, "title": title, "detail": detail, "action": action,
+             "kind": item_kind(title)}
+        )  # fmt: skip
 
     agent = s.get("agent") or {}
     health = agent.get("health", "never")
@@ -213,7 +242,16 @@ def attention_items(s: dict[str, Any]) -> list[dict[str, str]]:
             )
 
     if not items:
-        add("ok", "Nothing needs your attention", "The agent is running and every check passed.")
+        if results:
+            add(
+                "ok", "Nothing needs your attention", "The agent is running and every check passed."
+            )
+        else:  # never claim success before a single check has run
+            add(
+                "info",
+                "The first safe tests have not finished yet",
+                "Results appear in roughly 10-20 seconds; this page updates by itself.",
+            )
     items.sort(key=lambda i: LEVEL_ORDER[i["level"]])
     return items
 
@@ -265,7 +303,17 @@ def build_summary(now: float | None = None) -> dict[str, Any]:
         "explain": EXPLAIN,
     }
     summary["attention"] = attention_items(summary)
+    summary["agents"] = run_agents(summary, _rule_titles(rules))
     return summary
+
+
+def _rule_titles(rules: list[Any]) -> dict[str, list[str]]:
+    """technique id -> titles of the rules that claim to cover it."""
+    out: dict[str, list[str]] = {}
+    for rule in rules:
+        for tid in rule.technique_ids:
+            out.setdefault(tid, []).append(rule.title)
+    return out
 
 
 def demo_summary() -> dict[str, Any]:
@@ -372,6 +420,10 @@ def demo_summary() -> dict[str, Any]:
         "explain": EXPLAIN,
     }
     summary["attention"] = attention_items(summary)
+    summary["agents"] = run_agents(
+        summary,
+        {"T1059.001": ["Suspicious Encoded PowerShell"], "T1082": ["System Information Discovery"]},
+    )
     return summary
 
 
@@ -430,13 +482,36 @@ def render_html(
     if static and not auth:
         payload["static"] = True
     blob = json.dumps(payload).replace("<", "\\u003c")
-    return TEMPLATE.read_text(encoding="utf-8").replace("__PTAF_DATA__", blob)
+    page = TEMPLATE.read_text(encoding="utf-8")
+    lab = LAB_JS.read_text(encoding="utf-8").replace("</script", "<\\/script")
+    return page.replace("__PTAF_DATA__", blob).replace("/*__PTAF_LAB__*/", lab)
 
 
 CSP = (
     "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
     "connect-src 'self'; img-src data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
+
+# --- live updates (server-sent events) -----------------------------------------------------------
+STREAM_POLL_S = 0.5  # how often the stream checks for new data
+STREAM_KEEPALIVE_S = 15.0
+MAX_STREAMS = 16  # cap concurrent live connections so they cannot exhaust the server
+_stream_slots = threading.BoundedSemaphore(MAX_STREAMS)
+_WATCHED = ("status.json", "alerts.jsonl", "history.jsonl", "doctor.json")
+
+
+def _fingerprint() -> tuple:
+    """Changes whenever the agent writes anything the dashboard shows."""
+    out = []
+    base = state.state_dir()
+    for name in _WATCHED:
+        try:
+            st = (base / name).stat()
+            out.append((st.st_mtime_ns, st.st_size))
+        except OSError:
+            out.append(None)
+    return tuple(out)
+
 
 _doctor_lock = threading.Lock()
 _doctor_cache: dict[str, Any] = {"at": 0.0, "data": None}
@@ -485,6 +560,42 @@ def make_handler(demo: bool = False, fleet_dir: Path | None = None, token: str |
             if self.command != "HEAD":
                 self.wfile.write(body)
 
+        def _stream(self) -> None:
+            """Push a tiny 'update' event whenever agent state changes; the page then re-fetches.
+
+            Uses fetch streaming on the client (not EventSource) so the access token can travel in a
+            header. Keepalives hold the connection open; a dead client is noticed on the next write.
+            """
+            if not _stream_slots.acquire(blocking=False):
+                return self._json(503, {"error": "too many live connections"})
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream")
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Accel-Buffering", "no")
+                self.send_header("Content-Security-Policy", CSP)
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(b"retry: 3000\nevent: hello\ndata: {}\n\n")
+                self.wfile.flush()
+                last, idle = _fingerprint(), 0.0
+                while True:
+                    time.sleep(STREAM_POLL_S)
+                    now = _fingerprint()
+                    if now != last:
+                        last, idle, msg = now, 0.0, b"event: update\ndata: {}\n\n"
+                    else:
+                        idle += STREAM_POLL_S
+                        if idle < STREAM_KEEPALIVE_S:
+                            continue
+                        idle, msg = 0.0, b": keepalive\n\n"
+                    self.wfile.write(msg)
+                    self.wfile.flush()
+            except OSError:
+                pass  # client went away
+            finally:
+                _stream_slots.release()
+
         def _json(self, code: int, obj: Any) -> None:
             self._send(code, json.dumps(obj).encode(), "application/json")
 
@@ -505,6 +616,8 @@ def make_handler(demo: bool = False, fleet_dir: Path | None = None, token: str |
                 return self._send(404, b"not found", "text/plain")
             if not authorised(self.headers):
                 return self._json(401, {"error": "access token required"})
+            if route == "/api/stream":
+                return self._stream()
             if route == "/api/summary":
                 return self._json(200, demo_summary() if demo else build_summary())
             if route == "/api/fleet":
@@ -530,11 +643,52 @@ def make_handler(demo: bool = False, fleet_dir: Path | None = None, token: str |
     return Handler
 
 
-def serve(host: str = "127.0.0.1", port: int = 8787, demo: bool = False,
-          fleet_dir: Path | None = None, token: str | None = None) -> None:  # fmt: skip
-    server = ThreadingHTTPServer((host, port), make_handler(demo, fleet_dir, token))
-    print(f"PTAF dashboard on http://{host}:{port}" + ("/#token=<your token>" if token else "")
-          + "  (Ctrl-C to stop)")  # fmt: skip
+def stop_on_signals() -> None:
+    """Turn SIGTERM (systemd, Docker, kill) and SIGINT into a normal clean shutdown.
+
+    A background job started by a non-interactive shell inherits SIGINT as IGNORED, and SIGTERM
+    would otherwise kill the process outright, skipping cleanup (lock, final status). Both are
+    routed to KeyboardInterrupt so the usual ``finally`` blocks run. Main thread only.
+    """
+    import signal
+
+    def _raise(*_: Any) -> None:
+        raise KeyboardInterrupt
+
+    for name in ("SIGINT", "SIGTERM"):
+        sig = getattr(signal, name, None)
+        if sig is not None:
+            try:
+                signal.signal(sig, _raise)
+            except (ValueError, OSError):
+                pass  # not the main thread, or not permitted here
+
+
+def make_server(
+    host: str = "127.0.0.1",
+    port: int = 8787,
+    demo: bool = False,
+    fleet_dir: Path | None = None,
+    token: str | None = None,
+) -> ThreadingHTTPServer:
+    """Bind the dashboard server (raises OSError if the port is taken)."""
+    return ThreadingHTTPServer((host, port), make_handler(demo, fleet_dir, token))
+
+
+def serve(
+    host: str = "127.0.0.1",
+    port: int = 8787,
+    demo: bool = False,
+    fleet_dir: Path | None = None,
+    token: str | None = None,
+) -> None:
+    server = make_server(host, port, demo, fleet_dir, token)
+    stop_on_signals()
+    print(
+        f"PTAF dashboard on http://{host}:{port}"
+        + ("/#token=<your token>" if token else "")
+        + "  (Ctrl-C to stop)"
+    )
     try:
         server.serve_forever()
     except KeyboardInterrupt:

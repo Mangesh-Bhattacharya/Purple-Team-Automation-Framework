@@ -9,6 +9,7 @@ host's own telemetry, and checks that the Sigma rules you ship actually fire.
 > solutions, exit codes, SOC allowlisting, and honest limits.
 
 ```bash
+ptaf up                   # one command: agent + live dashboard (opens your browser)
 pip install -e .
 ptaf info                 # OS / arch / VM / container fingerprint
 ptaf doctor               # preflight: how much can the sensor see on this machine?

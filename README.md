@@ -32,8 +32,12 @@ your Sigma rules still fire. If a rule silently stops working, it raises a
 (green = verified, yellow = untested, red = gap) and a coverage badge.
 
 ```bash
-pip install -e . && ptaf selftest
+pip install .
+ptaf up          # starts the agent AND the live dashboard, opens your browser
 ```
+
+The first safe tests run immediately; results appear in about 10 seconds and the page then updates
+live. `Ctrl-C` (or `SIGTERM`, as `systemd`/Docker send) stops everything cleanly.
 
 Details, limits and safety model: [docs/sentinel.md](docs/sentinel.md). For organizations: [docs/enterprise.md](docs/enterprise.md). **Kali Linux:** [docs/kali.md](docs/kali.md).
 

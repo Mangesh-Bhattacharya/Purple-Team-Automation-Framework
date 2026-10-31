@@ -159,7 +159,12 @@ def _summary(**over):
     base = {
         "generated": iso(0), "host": {"os": "windows"},
         "agent": {"health": "online", "interval_s": 3600, "collector": {}},
-        "latest": {"started": iso(-60), "results": [], "skipped": [], "rule_errors": []},
+        "latest": {
+            "started": iso(-60),
+            "results": [{"name": "A", "technique_id": "T1140", "status": "detected"}],
+            "skipped": [],
+            "rule_errors": [],
+        },
         "drift": [], "health_checks": None,
     }  # fmt: skip
     base.update(over)
@@ -328,6 +333,13 @@ def test_an_exported_snapshot_is_static_so_it_never_polls_a_server(tmp_path):
     assert out.exit_code == 0
     html = page.read_text(encoding="utf-8")
     assert '"static": true' in html and "!DATA.static" in html
-    assert '"static"' not in dash.render_html(
+    assert '"static": true' not in dash.render_html(
         dash.demo_summary(), None
     )  # live pages are not static
+
+
+def test_never_claims_every_check_passed_before_any_check_has_run():
+    items = dash.attention_items(_summary(latest={"started": iso(-1), "results": []}))
+    assert [i["level"] for i in items] == ["info"]
+    assert "every check passed" not in " ".join(i["detail"] for i in items)
+    assert [i["level"] for i in dash.attention_items(_summary())] == ["ok"]  # with results: fine

@@ -290,6 +290,85 @@ def export_summary() -> None:
 
 
 @main.command()
+@_rules_opt
+@_only_opt
+@_skip_opt
+@_collector_opt
+@click.option("--host", default="127.0.0.1", show_default=True, help="Dashboard bind address.")
+@click.option("--port", default=8787, show_default=True, help="Dashboard port.")
+@click.option("--interval", default=3600, show_default=True, help="Seconds between self-tests.")
+@click.option("--token", default=None, help="Dashboard access token (required beyond localhost).")
+@click.option("--no-browser", is_flag=True, help="Do not open a browser window.")
+def up(rules_dir, only, skip, collector, host, port, interval, token, no_browser) -> None:
+    """Start everything: the agent AND the live dashboard, in one command.
+
+    The first safe tests run immediately, so the page fills in within seconds and then updates the
+    moment anything happens. If an agent is already running, only the dashboard is started for it.
+    Press Ctrl-C to stop both cleanly.
+    """
+    import threading
+    import webbrowser
+
+    token = token or os.environ.get("PTAF_DASHBOARD_TOKEN") or None
+    if host not in ("127.0.0.1", "localhost", "::1") and not token:
+        raise click.UsageError("refusing to serve beyond localhost without --token")
+    if interval < 30:
+        raise click.UsageError("--interval must be at least 30 seconds")
+    _validate_ids(only, skip)
+
+    mon = None
+    try:  # is an agent already running for this state directory?
+        state.release_lock(state.acquire_lock())
+    except state.AlreadyRunning as exc:
+        click.echo(f"An agent is already running ({exc}). Starting only the dashboard for it.")
+    else:
+        hostinfo = collect_host_info()
+        rules, errors = load_rules(rules_dir)
+        try:
+            mon = Monitor(
+                rules, errors, hostinfo, interval_s=interval, emit_stdout=False,
+                only=only, skip=skip, collector_mode=collector or default_mode(),
+            )  # fmt: skip
+        except SensorUnavailable as exc:
+            click.echo(f"ptaf: {exc}", err=True)
+            raise SystemExit(EXIT_SENSOR)
+
+    try:
+        server = dash.make_server(host, port, token=token)
+    except OSError as exc:
+        click.echo(f"ptaf: cannot start the dashboard on {host}:{port}: {exc}", err=True)
+        click.echo("      Pick another port with --port, or stop what is using it.", err=True)
+        raise SystemExit(2)
+
+    thread = None
+    if mon is not None:
+        thread = threading.Thread(target=mon.run, name="ptaf-agent", daemon=True)
+        thread.start()
+    url = f"http://{host}:{port}/" + ("#token=" + token if token else "")
+    click.echo("PTAF Sentinel is running.")
+    click.echo(f"  Dashboard : {url}")
+    click.echo("  First results appear in roughly 10-20 seconds; the page then updates live.")
+    click.echo("  Stop with Ctrl-C.")
+    if not no_browser:
+        try:
+            if not webbrowser.open(url):
+                click.echo("  (no browser could be opened here; open the URL above yourself)")
+        except webbrowser.Error:
+            pass
+    dash.stop_on_signals()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        click.echo("\nStopping...")
+    finally:
+        server.server_close()
+        if mon is not None:
+            mon.stop()
+            if thread is not None:
+                thread.join(timeout=45)
+
+
+@main.command()
 @click.option(
     "--os",
     "os_name",
