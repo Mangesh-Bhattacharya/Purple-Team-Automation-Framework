@@ -27,7 +27,7 @@ Kali's default user is not root, and that matters:
 |---|---|---|
 | Sees other users' processes | no (largely blind: see `ptaf doctor`) | yes |
 | Sensor | polling every 50 ms (misses short commands) | **event-driven kernel proc connector** |
-| Offensive-tool canaries (`nmap`, `hydra`, ...) | skipped, with the reason shown | run |
+| Offensive-tool canaries (`nmap`, `hydra`, ...) | skipped under polling, with the reason shown | run |
 
 ```bash
 sudo "$(command -v ptaf)" doctor
@@ -45,8 +45,9 @@ feed that reports every `exec()` the moment it happens, with no extra packages a
 module. PTAF reads the command line immediately and tracks fork lineage so a canary's
 descendants stay attributable even through shell subshells.
 
-* `ptaf doctor` proves it works with a live probe (a subscribe call can succeed and still
-  deliver nothing inside a container, so it is not taken on trust).
+* `ptaf doctor` proves it works with a live probe. A subscribe call can succeed and still
+  deliver nothing inside a container, and some kernels allow it without root, so neither is
+  assumed: a process is started and its exec event must actually arrive.
 * `--collector auto|poll|procconn` (or `PTAF_COLLECTOR`). `auto` uses the event-driven sensor when
   it is genuinely available and **says why** when it falls back. Forcing `procconn` where it cannot
   work exits with code 3, never a silent downgrade.
@@ -82,15 +83,32 @@ smoke test of that sensor.
 
 ## Verification status (be skeptical, check CI)
 
-* The proc-connector **wire-format parser**, lineage tracking, sensor selection, Kali detection
-  and installer syntax are unit-tested on every OS.
-* CI runs the real installer inside the official `kalilinux/kali-rolling` image (including its
-  failure paths: no Python, no venv) and runs the live proc-connector tests plus the tool
-  canaries as root on a real Ubuntu kernel. See the `kali` and `linux-root-sensor` jobs.
-* **Not yet verified:** a physical Kali machine, ARM Kali, NetHunter, hardened/EDR-protected
-  Kali, or Kali ISO live boot. The tool-canary Image names for script-based tools (sqlmap, nikto
-  appear as `python3`/`perl` running the script) follow Kali's packaging and are modelled; the
-  CI job exercises sqlmap for real.
+**Proven in CI on real systems**
+
+* The official `kalilinux/kali-rolling` image (Kali 2026.3): Kali is detected, all 21 rules load
+  after a real non-editable install, the offensive tools are inventoried, skip reasons are
+  reported honestly, and the installer's failure paths (no Python, no venv) give the right advice.
+* A real Linux kernel (a Hyper-V VM) with the **event-driven sensor**: all 9 applicable canaries
+  were detected (100%), including real `nmap`, `hydra`, `tcpdump` and the script-based `sqlmap`
+  (which appears as the Python interpreter running the script). Live tests confirmed that every
+  exec event arrives, that commands living tens of milliseconds are caught, that a forked-only
+  subshell does not break attribution, and that processes that vanish are counted, not lost.
+* The wire-format parser, lineage tracking, sensor selection, Kali detection and installer syntax
+  are unit-tested on every OS.
+
+**Measured limits**
+
+* About 1 ms processes (`/bin/true`) could not be read in time: 0 of 60. The kernel feed delivers
+  every event, but the command line is read from `/proc` afterwards, so a process gone by then is
+  counted as `missed`, never silently dropped. Real tools such as `nmap`, `hydra` and `sqlmap`
+  live far longer. Below that floor you need auditd or eBPF, which PTAF does not use yet.
+
+**Not yet verified**
+
+* A physical Kali machine, ARM Kali (Raspberry Pi, Apple Silicon VMs), NetHunter, a live-boot ISO,
+  or a hardened/EDR-protected Kali. The Kali container job runs with the polling sensor (a container
+  cannot use the proc connector), so tool canaries are skipped there by design; their real run is
+  the root-sensor job above.
 
 ## Limits
 

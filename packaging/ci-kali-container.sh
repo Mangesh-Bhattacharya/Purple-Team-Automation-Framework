@@ -43,7 +43,8 @@ echo "== 6. doctor, canaries, rules"
 ptaf doctor || true
 ptaf doctor --json-out | python3 -c "import json,sys; d={c['name']:c for c in json.load(sys.stdin)}; assert 'kali linux' in d, 'Kali not detected'; print('kali detected:', d['kali linux']['detail'])"
 ptaf rules check --strict
-ptaf canaries | head -20
+ptaf canaries > /tmp/canaries.txt   # (not piped to head: pipefail would trip on SIGPIPE)
+head -20 /tmp/canaries.txt
 
 echo "== 7. real self-test (container: polling sensor, so Kali tool canaries are skipped by design)"
 ptaf selftest | tee /tmp/selftest.txt

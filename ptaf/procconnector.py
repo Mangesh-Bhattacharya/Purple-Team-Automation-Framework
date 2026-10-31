@@ -6,8 +6,10 @@ live for less time than that, which describes most offensive tooling (``nmap --v
 ``exec()``, so even a process that lives for a few milliseconds is seen and its command line is
 read immediately.
 
-Requirements: Linux, and root or CAP_NET_ADMIN (the kernel requires it to subscribe). No extra
-packages. In a container the events are scoped to the container's PID namespace.
+Requirements: Linux. Subscribing typically needs root or CAP_NET_ADMIN, though some kernels
+allow it unprivileged (GitHub's Ubuntu runners do), so ``available()`` proves it with a live probe
+rather than assuming. No extra packages. It does not work inside containers or other
+non-initial PID namespaces.
 
 Honest limits: it still reads ``/proc/<pid>/cmdline`` after the event arrives, so a process that
 exits within microseconds can be gone before it is read (that event is counted in ``missed``,
