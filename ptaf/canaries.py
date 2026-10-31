@@ -56,6 +56,10 @@ class Canary:
     modeled_events: Callable[[str, list[str]], list[Event]]  # (os, argv) -> events
     # A canary whose prerequisite is missing is SKIPPED, never reported as a detection gap.
     precondition: Callable[[], bool] = lambda: True
+    # "any": works with either sensor. "event": the process lives only milliseconds, so it needs
+    # the event-driven sensor (Linux proc connector, root). Under polling it is skipped, because
+    # reporting it as a gap would blame the rules for what is really a sensor limitation.
+    min_sensor: str = "any"
 
     def available_on(self, os_name: str) -> bool:
         return os_name in self.platforms and self.precondition()
@@ -65,8 +69,13 @@ def _b64(text: str) -> str:
     return base64.b64encode(text.encode()).decode()
 
 
+#: Appears in the command line of every canary that can carry it, so a SOC can recognise and
+#: allowlist or tag the test activity (e.g. a SIEM filter on CommandLine containing this).
+CANARY_TAG = "ptaf-canary"
+
+
 def _sh(script: str) -> list[str]:
-    return ["/bin/sh", "-c", script]
+    return ["/bin/sh", "-c", f"{script} # {CANARY_TAG}"]
 
 
 # --- Windows ---------------------------------------------------------------
@@ -87,7 +96,7 @@ def _win_ps_bypass_hidden(_m: str) -> list[str]:
         "-WindowStyle",
         "Hidden",
         "-Command",
-        "Start-Sleep -Milliseconds 1200",
+        f"Start-Sleep -Milliseconds 1200 # {CANARY_TAG}",
     ]
 
 
@@ -123,7 +132,7 @@ def _python_exe() -> str | None:
 
 
 def _unix_python_inline_b64(_m: str) -> list[str]:
-    code = "import base64,time; base64.b64decode('cHRhZg=='); time.sleep(1)"
+    code = f"import base64,time; base64.b64decode('cHRhZg=='); time.sleep(1)  # {CANARY_TAG}"
     return [_python_exe() or "python3", "-c", code]
 
 
@@ -162,7 +171,7 @@ def _m_pipeline(child_image: str, child_cmd: str):
     return build
 
 
-CANARIES: tuple[Canary, ...] = (
+_CORE: tuple[Canary, ...] = (
     Canary(
         "win-encoded-powershell",
         "T1059.001",
@@ -222,6 +231,7 @@ CANARIES: tuple[Canary, ...] = (
         "Pipes a random marker through `openssl enc -d -base64`, discards output.",
         _unix_openssl_decode,
         _m_pipeline("/usr/bin/openssl", "openssl enc -d -base64"),
+        precondition=lambda: shutil.which("openssl") is not None,
     ),
     Canary(
         "unix-history-evasion",
@@ -267,9 +277,95 @@ CANARIES: tuple[Canary, ...] = (
 )
 
 
+# --- Kali Linux offensive-tool canaries --------------------------------------------------
+# Each runs the REAL tool with a flag that only prints version/usage: no scanning, no network, no
+# files. They exist so a purple-team exercise can check that execution of well-known offensive
+# tooling is seen. They run only if the tool is installed (Kali ships all of them).
+# (id, binary, args, technique, name, tactic, interpreter-for-script-tools)
+_KALI_TOOLS = (
+    ("nmap", "nmap", ["--version"], "T1046", "Network scanner (nmap) executed", "Discovery", None),
+    ("masscan", "masscan", ["--version"], "T1046", "Mass port scanner (masscan) executed",
+     "Discovery", None),
+    ("hydra", "hydra", ["-h"], "T1110.001", "Online password-guessing tool (hydra) executed",
+     "Credential Access", None),
+    ("john", "john", ["--list=build-info"], "T1110.002", "Password cracker (john) executed",
+     "Credential Access", None),
+    ("hashcat", "hashcat", ["--version"], "T1110.002", "Password cracker (hashcat) executed",
+     "Credential Access", None),
+    ("sqlmap", "sqlmap", ["--version"], "T1190", "SQL-injection tool (sqlmap) executed",
+     "Initial Access", "python3"),
+    ("nikto", "nikto", ["-Version"], "T1190", "Web vulnerability scanner (nikto) executed",
+     "Initial Access", "perl"),
+    ("gobuster", "gobuster", ["version"], "T1595.003", "Content brute-forcer (gobuster) executed",
+     "Reconnaissance", None),
+    ("tcpdump", "tcpdump", ["--version"], "T1040", "Packet capture tool (tcpdump) executed",
+     "Credential Access", None),
+)  # fmt: skip
+
+
+def _kali_canaries() -> tuple[Canary, ...]:
+    out = []
+    for cid, binary, args, tech, name, tactic, interp in _KALI_TOOLS:
+
+        def argv(_m: str, b=binary, a=tuple(args)) -> list[str]:
+            return [shutil.which(b) or b, *a]
+
+        def model(os_name: str, _argv: list[str], b=binary, a=tuple(args), i=interp) -> list[Event]:
+            if i:  # script tools appear as the interpreter running the script
+                cmd = [i, f"/usr/bin/{b}", *a]
+                return [_ev(f"/usr/bin/{i}", cmd)]
+            return [_ev(f"/usr/bin/{b}", [b, *a])]
+
+        out.append(
+            Canary(
+                id=f"kali-{cid}", technique_id=tech, name=name, tactic=tactic,
+                platforms=("linux",),
+                description=f"Runs `{binary} {' '.join(args)}` (prints version/usage only).",
+                build_argv=argv, modeled_events=model,
+                precondition=lambda b=binary: shutil.which(b) is not None,
+                min_sensor="event",
+            )
+        )  # fmt: skip
+    return tuple(out)
+
+
+CANARIES: tuple[Canary, ...] = _CORE + _kali_canaries()
+
+
 def new_marker() -> str:
     return uuid.uuid4().hex[:12]
 
 
-def canaries_for(os_name: str) -> list[Canary]:
-    return [c for c in CANARIES if c.available_on(os_name)]
+def canaries_for(
+    os_name: str,
+    only: tuple[str, ...] = (),
+    skip: tuple[str, ...] = (),
+    sensor: str | None = None,
+) -> list[Canary]:
+    """Canaries runnable on ``os_name``; ``only``/``skip`` filter by id.
+
+    ``sensor`` is ``"event"`` or ``"poll"``; canaries needing the event-driven sensor are left
+    out under ``"poll"``. ``None`` applies no sensor filtering.
+    """
+    return [
+        c
+        for c in CANARIES
+        if c.available_on(os_name)
+        and (not only or c.id in only)
+        and c.id not in skip
+        and not (sensor == "poll" and c.min_sensor == "event")
+    ]
+
+
+def skipped_for_sensor(os_name: str, sensor: str) -> list[Canary]:
+    """Canaries that would run on this OS but are held back by the sensor in use."""
+    return [
+        c
+        for c in CANARIES
+        if c.available_on(os_name) and sensor == "poll" and c.min_sensor == "event"
+    ]
+
+
+def unknown_ids(ids: tuple[str, ...]) -> list[str]:
+    known = {c.id for c in CANARIES}
+    return [i for i in ids if i not in known]

@@ -40,6 +40,9 @@ class HostInfo:
     python: str
     virtualization: str  # "none" | hypervisor name | "unknown"
     container: str | None  # docker / podman / kubernetes / wsl / None
+    distro: str | None = None  # Linux distribution id, e.g. "kali", "ubuntu", "debian"
+    distro_version: str | None = None
+    kali: bool = False  # True on Kali Linux (any flavour: bare metal, VM, ARM, WSL, container)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -120,6 +123,39 @@ def _detect_container(os_name: str) -> str | None:
     return None
 
 
+def parse_os_release(text: str) -> dict[str, str]:
+    """Parse /etc/os-release (KEY=value or KEY="value" lines). Pure, so it is unit-tested."""
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        out[key.strip()] = value.strip().strip('"').strip("'")
+    return out
+
+
+def is_kali(release: dict[str, str]) -> bool:
+    """Kali identifies itself with ID=kali (ID_LIKE=debian); some derivatives only set ID_LIKE."""
+    like = release.get("ID_LIKE", "").lower().split()
+    return release.get("ID", "").lower() == "kali" or "kali" in like
+
+
+def _distro() -> dict[str, str]:
+    return parse_os_release(_read("/etc/os-release") or _read("/usr/lib/os-release"))
+
+
+def _distro_fields(os_name: str) -> dict:
+    if os_name != "linux":
+        return {}
+    rel = _distro()
+    return {
+        "distro": rel.get("ID") or None,
+        "distro_version": rel.get("VERSION_ID") or rel.get("VERSION") or None,
+        "kali": is_kali(rel),
+    }
+
+
 def collect_host_info() -> HostInfo:
     os_name = _os_family()
     return HostInfo(
@@ -130,4 +166,5 @@ def collect_host_info() -> HostInfo:
         python=platform.python_version(),
         virtualization=_detect_virtualization(os_name),
         container=_detect_container(os_name),
+        **_distro_fields(os_name),
     )

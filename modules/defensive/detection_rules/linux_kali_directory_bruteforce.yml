@@ -1,0 +1,28 @@
+title: Content/Directory Brute-Forcing Tool Executed (linux)
+id: 076108d9-1833-5c62-b954-e3d9fcbe4771
+status: experimental
+description: >
+  Detects wordlist-driven content discovery tools. Maps to T1595.003.
+references:
+  - https://attack.mitre.org/techniques/T1595/003/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection:
+    Image|endswith:
+      - '/gobuster'
+      - '/ffuf'
+      - '/feroxbuster'
+      - '/dirb'
+      - '/wfuzz'
+      - '/dirsearch'
+  condition: selection
+falsepositives:
+  - Authorised web application tests.
+level: medium
+tags:
+  - attack.reconnaissance
+  - attack.t1595.003

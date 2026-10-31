@@ -15,11 +15,40 @@ from typing import Any
 
 from .validation import SelfTestReport
 
+MAX_LOG_BYTES = 10 * 1024 * 1024  # rotate a JSONL log once it passes this size
+KEEP_ROTATED = 3  # alerts.jsonl.1 .. .3 are kept; older ones are deleted
+
 
 def state_dir() -> Path:
+    """State lives in ~/.ptaf (or $PTAF_HOME). Alerts contain command lines, which can hold
+    secrets, so on POSIX the directory is private to the owning user (0700)."""
     base = Path(os.environ.get("PTAF_HOME") or Path.home() / ".ptaf")
     base.mkdir(parents=True, exist_ok=True)
+    if os.name == "posix":
+        try:
+            base.chmod(0o700)
+        except OSError:
+            pass  # e.g. a directory we do not own; doctor reports it
     return base
+
+
+def _rotate(path: Path) -> None:
+    """Cap disk use of an append-only log: path -> path.1 -> .2 -> .3, oldest dropped."""
+    try:
+        if path.stat().st_size < MAX_LOG_BYTES:
+            return
+    except OSError:
+        return
+    for i in range(KEEP_ROTATED, 0, -1):
+        older = path.with_name(f"{path.name}.{i}")
+        newer = path if i == 1 else path.with_name(f"{path.name}.{i - 1}")
+        try:
+            if newer.exists():
+                if older.exists():
+                    older.unlink()
+                newer.replace(older)
+        except OSError:
+            return
 
 
 def _state_file() -> Path:
@@ -59,10 +88,44 @@ def save(report: SelfTestReport) -> None:
         "statuses": {r.canary_id: r.status for r in report.results},
     }
     _state_file().write_text(json.dumps(payload, indent=2), encoding="utf-8")
-    with (state_dir() / "history.jsonl").open("a", encoding="utf-8") as fh:
+    history = state_dir() / "history.jsonl"
+    _rotate(history)
+    with history.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(report.to_dict()) + "\n")
 
 
 def append_jsonl(name: str, record: dict[str, Any]) -> None:
-    with (state_dir() / name).open("a", encoding="utf-8") as fh:
+    path = state_dir() / name
+    _rotate(path)
+    with path.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record) + "\n")
+
+
+class AlreadyRunning(RuntimeError):
+    """Another monitor already holds the lock for this state directory."""
+
+
+def acquire_lock(name: str = "monitor.lock") -> Path:
+    """Single-instance guard so two agents cannot double-alert or corrupt state.
+
+    A stale lock (its process is gone) is taken over; a live one raises AlreadyRunning.
+    """
+    import psutil
+
+    lock = state_dir() / name
+    try:
+        holder = int(lock.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        holder = None
+    if holder and holder != os.getpid() and psutil.pid_exists(holder):
+        raise AlreadyRunning(f"another PTAF monitor is running (pid {holder})")
+    lock.write_text(str(os.getpid()), encoding="utf-8")
+    return lock
+
+
+def release_lock(lock: Path) -> None:
+    try:
+        if lock.read_text(encoding="utf-8").strip() == str(os.getpid()):
+            lock.unlink()
+    except OSError:
+        pass

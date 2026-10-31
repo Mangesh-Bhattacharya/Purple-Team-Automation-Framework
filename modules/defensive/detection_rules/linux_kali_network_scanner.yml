@@ -1,0 +1,26 @@
+title: Network Scanner Executed (linux)
+id: 0a836166-9de2-5b65-ae2c-9a81782c647e
+status: experimental
+description: >
+  Detects well-known network scanners. Expected on a red-team or Kali host; on a production server it is a strong signal. Maps to T1046.
+references:
+  - https://attack.mitre.org/techniques/T1046/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection:
+    Image|endswith:
+      - '/nmap'
+      - '/masscan'
+      - '/zmap'
+      - '/rustscan'
+  condition: selection
+falsepositives:
+  - Authorised vulnerability scanning and network administrators; scope by host role.
+level: medium
+tags:
+  - attack.discovery
+  - attack.t1046

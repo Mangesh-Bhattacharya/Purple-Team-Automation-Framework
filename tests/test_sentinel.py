@@ -60,7 +60,7 @@ def test_unknown_selection_and_modifier_fail_loudly():
     bad_cond = RULE.replace("sel and not filt", "sel and nope")
     with pytest.raises(UnsupportedRule):
         Rule.from_yaml(bad_cond).matches(ev())
-    bad_mod = RULE.replace("endswith", "re")
+    bad_mod = RULE.replace("endswith", "base64")
     with pytest.raises(UnsupportedRule):
         Rule.from_yaml(bad_mod).matches(ev())
 
@@ -301,3 +301,145 @@ def test_a_real_gap_stays_missed_after_retry(monkeypatch):
     )
     res = validation.run_canary(CANARIES[0], [], collect_host_info(), EventBuffer())
     assert res.status == "missed"
+
+
+# --- extended Sigma coverage + compatibility report ----------------------------
+def _r(detection_yaml, product="linux", category="process_creation"):
+    return Rule.from_yaml(
+        f"title: t\nid: x\nlogsource: {{category: {category}, product: {product}}}\n"
+        f"detection:\n{detection_yaml}\nlevel: low\ntags: [attack.t1059]\n"
+    )
+
+
+def test_wildcards_regex_windash_cidr_exists_null_and_them():
+    wild = _r(r"  s:\n    Image: '*\powershell.exe'\n  condition: s".replace("\\n", "\n"))
+    assert wild.matches(ev(Image="C:\\Windows\\powershell.exe"))
+    assert not wild.matches(ev(Image="C:\\Windows\\powershell.exe.bak"))
+    rx = _r("  s:\n    CommandLine|re: 'sc\\s+(create|config)'\n  condition: s")
+    assert rx.matches(ev(CommandLine="SC  CREATE svc")) and not rx.matches(ev(CommandLine="scx"))
+    wd = _r("  s:\n    CommandLine|windash|contains: ' -enc'\n  condition: s")
+    assert wd.matches(ev(CommandLine="powershell /enc AAA")) and wd.matches(
+        ev(CommandLine="x -enc")
+    )
+    ip = _r("  s:\n    DestinationIp|cidr: '10.0.0.0/8'\n  condition: s")
+    assert ip.matches(ev(DestinationIp="10.2.3.4")) and not ip.matches(ev(DestinationIp="8.8.8.8"))
+    ex = _r("  s:\n    ParentImage|exists: false\n  condition: s")
+    assert ex.matches(ev(ParentImage="")) and not ex.matches(ev(ParentImage="/bin/sh"))
+    nl = _r("  s:\n    User: null\n  condition: s")
+    assert nl.matches(ev(User="")) and not nl.matches(ev(User="bob"))
+    them = _r("  a:\n    Image|endswith: '/x'\n  b:\n    User: bob\n  condition: all of them")
+    assert them.matches(ev(Image="/bin/x", User="bob")) and not them.matches(
+        ev(Image="/bin/x", User="alice")
+    )
+    kw = _r("  keywords:\n    - 'mimikatz'\n  condition: keywords")
+    assert kw.matches(ev(CommandLine="run MIMIKATZ now")) and not kw.matches(ev(CommandLine="ls"))
+
+
+def test_regex_guards_reject_oversized_or_invalid_patterns():
+    big = _r("  s:\n    CommandLine|re: '" + "a" * 1200 + "'\n  condition: s")
+    assert "regex longer" in big.unsupported_reason()
+    bad = _r("  s:\n    CommandLine|re: '(unclosed'\n  condition: s")
+    assert "invalid regex" in bad.unsupported_reason()
+
+
+def test_compat_report_is_three_state_and_names_the_reason():
+    from ptaf.sigma_lite import check_rule
+
+    ok = check_rule(_r("  s:\n    Image|endswith: '/x'\n  condition: s"))
+    assert ok.verdict == "runnable"
+    part = check_rule(_r("  s:\n    OriginalFileName: 'x.exe'\n  condition: s"))
+    assert part.verdict == "partial" and "OriginalFileName" in part.reasons[0]
+    net = check_rule(
+        _r("  s:\n    Image|endswith: '/x'\n  condition: s", category="network_connection")
+    )
+    assert net.verdict == "unsupported" and "network_connection" in net.reasons[0]
+    bad = check_rule(_r("  s:\n    Image|base64: 'x'\n  condition: s"))
+    assert bad.verdict == "unsupported"
+
+
+# --- collector robustness (enterprise long-running behaviour) -------------------
+def test_collector_forgets_exited_processes_so_memory_stays_bounded():
+    import subprocess
+    import time
+
+    col = ProcessCollector(lambda e: None, interval=0.02)
+    col.start()
+    try:
+        base = len(col._seen)
+        for _ in range(40):
+            subprocess.run([sys.executable, "-c", "pass"], check=False)
+        time.sleep(0.6)
+        grown = len(col._seen) - base
+    finally:
+        col.stop()
+    assert grown < 15, f"seen-table grew by {grown} after 40 short-lived processes (leak)"
+
+
+def test_collector_survives_a_crashing_callback_and_keeps_collecting():
+    import subprocess
+    import time
+
+    seen = []
+
+    def flaky(event):
+        seen.append(event)
+        raise RuntimeError("boom")
+
+    col = ProcessCollector(flaky, interval=0.02)
+    col.start()
+    try:
+        subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.6)"]).wait()
+        time.sleep(0.3)
+        alive = col._thread.is_alive()
+    finally:
+        col.stop()
+    assert alive and seen and col.errors >= 1 and "RuntimeError" in (col.last_error or "")
+
+
+def test_events_carry_the_extra_fields_real_sigma_rules_use():
+    import psutil
+
+    from ptaf.collector import _event_from_process
+
+    event = _event_from_process(psutil.Process())
+    assert {"ParentCommandLine", "CurrentDirectory", "Image", "CommandLine"} <= set(event)
+
+
+# --- state hardening -------------------------------------------------------------
+def test_state_dir_is_private_on_posix(tmp_path, monkeypatch):
+    import os
+    import stat
+
+    monkeypatch.setenv("PTAF_HOME", str(tmp_path / "s"))
+    d = state.state_dir()
+    if os.name == "posix":
+        assert stat.S_IMODE(d.stat().st_mode) == 0o700
+
+
+def test_logs_rotate_and_old_ones_are_dropped(tmp_path, monkeypatch):
+    monkeypatch.setenv("PTAF_HOME", str(tmp_path))
+    monkeypatch.setattr(state, "MAX_LOG_BYTES", 200)
+    for i in range(120):
+        state.append_jsonl("alerts.jsonl", {"i": i, "pad": "x" * 40})
+    names = sorted(p.name for p in tmp_path.iterdir() if p.name.startswith("alerts"))
+    assert names == ["alerts.jsonl", "alerts.jsonl.1", "alerts.jsonl.2", "alerts.jsonl.3"]
+    total = sum(p.stat().st_size for p in tmp_path.iterdir())
+    assert total < 6 * 200 + 400  # bounded, not growing with record count
+
+
+def test_second_monitor_is_refused_and_stale_lock_is_taken_over(tmp_path, monkeypatch):
+    import subprocess
+
+    monkeypatch.setenv("PTAF_HOME", str(tmp_path))
+    holder = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        (tmp_path / "monitor.lock").write_text(str(holder.pid), encoding="utf-8")
+        with pytest.raises(state.AlreadyRunning):
+            state.acquire_lock()
+    finally:
+        holder.kill()
+        holder.wait()
+    lock = state.acquire_lock()  # holder is dead -> stale lock is taken over
+    assert lock.read_text(encoding="utf-8").strip().isdigit()
+    state.release_lock(lock)
+    assert not lock.exists()

@@ -35,7 +35,7 @@ your Sigma rules still fire. If a rule silently stops working, it raises a
 pip install -e . && ptaf selftest
 ```
 
-Details, limits and safety model: [docs/sentinel.md](docs/sentinel.md).
+Details, limits and safety model: [docs/sentinel.md](docs/sentinel.md). For organizations: [docs/enterprise.md](docs/enterprise.md). **Kali Linux:** [docs/kali.md](docs/kali.md).
 
 ![Dashboard (demo data)](docs/assets/dashboard-demo.png)
 

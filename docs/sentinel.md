@@ -5,10 +5,17 @@ breaks, an EDR update changes behavior, and nobody finds out until an incident.
 Sentinel runs on the endpoint, fires **benign canary behaviors**, watches the
 host's own telemetry, and checks that the Sigma rules you ship actually fire.
 
+> Deploying in an organization? Start with [enterprise.md](enterprise.md): problems and
+> solutions, exit codes, SOC allowlisting, and honest limits.
+
 ```bash
 pip install -e .
 ptaf info                 # OS / arch / VM / container fingerprint
-ptaf selftest             # run canaries once; exit 1 on a gap or drift (CI-friendly)
+ptaf doctor               # preflight: how much can the sensor see on this machine?
+ptaf canaries             # list exactly what a self-test will run (nothing is executed)
+ptaf rules check <dir>    # which of YOUR Sigma rules can PTAF run, and why not
+ptaf selftest             # run canaries once; exit 1 gap/drift, 3 sensor problem (CI-friendly)
+ptaf selftest --format junit   # JUnit XML for Jenkins/GitLab/Actions
 ptaf monitor --interval 3600   # agent: live rule matching + hourly self-test + drift alerts
 ptaf export navigator > layer.json   # open at mitre-attack.github.io/attack-navigator
 ptaf export badge > badge.json       # shields.io endpoint badge

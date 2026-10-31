@@ -24,8 +24,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .canaries import Canary, canaries_for, new_marker
-from .collector import Event, ProcessCollector
+from .canaries import Canary, canaries_for, new_marker, skipped_for_sensor
+from .collector import Event
+from .sensor import make_collector
 from .platform_info import HostInfo
 from .sigma_lite import Rule, UnsupportedRule
 
@@ -47,8 +48,8 @@ def load_rules(rules_dir: Path | None = None) -> tuple[list[Rule], list[str]]:
     for path in sorted([*root.rglob("*.yml"), *root.rglob("*.yaml")]):
         try:
             rules.append(Rule.from_yaml(path.read_text(encoding="utf-8"), str(path)))
-        except (UnsupportedRule, ValueError, OSError) as exc:
-            errors.append(f"{path.name}: {exc}")
+        except Exception as exc:  # noqa: BLE001 - one bad rule file must never stop the agent
+            errors.append(f"{path.name}: {type(exc).__name__}: {str(exc).splitlines()[0][:160]}")
     return rules, errors
 
 
@@ -79,7 +80,13 @@ def descendants(events: list[Event], root_pid: int) -> list[Event]:
     while changed:
         changed = False
         for ev in events:
-            if ev["ProcessId"] not in family and ev["ParentProcessId"] in family:
+            if ev["ProcessId"] in family:
+                continue
+            # AncestorPids (event-driven sensor) bridges fork-only intermediates, such as a
+            # shell subshell, that never exec()d and so never produced an event of their own.
+            if ev["ParentProcessId"] in family or any(
+                a in family for a in ev.get("AncestorPids", ())
+            ):
                 family.add(ev["ProcessId"])
                 changed = True
     return [ev for ev in events if ev["ProcessId"] in family]
@@ -116,6 +123,8 @@ class SelfTestReport:
     results: list[CanaryResult]
     rules_loaded: int
     rule_errors: list[str]
+    sensor: dict[str, Any] | None = None  # which collector produced the telemetry, and why
+    skipped: list[dict[str, str]] = field(default_factory=list)  # canaries held back, with reason
 
     @property
     def coverage(self) -> float | None:
@@ -132,6 +141,8 @@ class SelfTestReport:
             "coverage_percent": self.coverage,
             "rules_loaded": self.rules_loaded,
             "rule_errors": self.rule_errors,
+            "sensor": self.sensor,
+            "skipped": self.skipped,
             "results": [asdict(r) for r in self.results],
         }
 
@@ -234,17 +245,41 @@ def run_selftest(
     buffer: EventBuffer | None = None,
     canaries: list[Canary] | None = None,
     synthetic_pids: set[int] | None = None,
+    only: tuple[str, ...] = (),
+    skip: tuple[str, ...] = (),
+    collector_mode: str = "auto",
+    sensor_info: dict[str, Any] | None = None,
 ) -> SelfTestReport:
-    """Run all canaries for this OS. Starts its own collector if no buffer is given."""
-    own_collector: ProcessCollector | None = None
+    """Run the canaries for this OS.
+
+    With no ``buffer`` it starts its own sensor (chosen by ``collector_mode``) and records which
+    one in the report. Canaries that need the event-driven sensor are skipped, with a stated
+    reason, when only the polling sensor is available: a gap is never blamed on the rules for
+    what is really a sensor limitation.
+    """
+    own_collector: Any = None
     if buffer is None:
         buffer = EventBuffer()
-        own_collector = ProcessCollector(buffer.add)
+        own_collector, name, note = make_collector(buffer.add, collector_mode)
+        sensor_info = {
+            "name": name,
+            "note": note,
+            "kind": "event" if name == "procconn" else "poll",
+        }
         own_collector.start()
+    kind = (sensor_info or {}).get("kind")
+    skipped: list[dict[str, str]] = []
+    if canaries is None:
+        canaries = canaries_for(host.os, only=only, skip=skip, sensor=kind)
+        if kind:
+            skipped = [
+                {"id": c.id, "reason": "needs the event-driven sensor (run as root on Linux)"}
+                for c in skipped_for_sensor(host.os, kind)
+                if (not only or c.id in only) and c.id not in skip
+            ]
     try:
         results = [
-            run_canary(c, rules, host, buffer, synthetic_pids=synthetic_pids)
-            for c in (canaries if canaries is not None else canaries_for(host.os))
+            run_canary(c, rules, host, buffer, synthetic_pids=synthetic_pids) for c in canaries
         ]
     finally:
         if own_collector:
@@ -255,4 +290,6 @@ def run_selftest(
         results=results,
         rules_loaded=len(rules),
         rule_errors=rule_errors,
+        sensor=sensor_info,
+        skipped=skipped,
     )
