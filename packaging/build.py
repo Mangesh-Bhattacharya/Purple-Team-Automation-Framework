@@ -37,6 +37,8 @@ def build_command(onedir: bool = False) -> list[str]:
         f"{ROOT / 'ptaf' / 'rules'}{SEP}ptaf/rules",
         "--add-data",
         f"{ROOT / 'ptaf' / 'dashboard.html'}{SEP}ptaf",
+        "--add-data",
+        f"{ROOT / 'ptaf' / 'lab.js'}{SEP}ptaf",
         "--paths",
         str(ROOT),
         "--distpath",

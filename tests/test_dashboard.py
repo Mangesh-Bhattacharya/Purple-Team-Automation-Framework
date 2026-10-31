@@ -1,6 +1,7 @@
 """Dashboard tests: summary shape, injection-safe embedding, HTTP routes."""
 
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -51,8 +52,15 @@ def test_template_never_uses_innerhtml_for_data():
 
 def test_template_makes_no_external_requests():
     text = dash.TEMPLATE.read_text(encoding="utf-8")
-    assert "http://" not in text.replace("http://www.w3.org/2000/svg", "")
-    assert "https://" not in text
+    lab = dash.LAB_JS.read_text(encoding="utf-8")
+    for source in (text, lab):
+        assert "http://" not in source.replace("http://www.w3.org/2000/svg", "")
+        # The one https:// literal is a guard that only lets links point at attack.mitre.org.
+        assert source.replace("https://attack.mitre.org/", "").count("https://") == 0
+        assert not re.search(
+            r"""(fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(\s*["']https?:""", source
+        )
+        assert "<script src" not in source and "<link " not in source
 
 
 @pytest.fixture

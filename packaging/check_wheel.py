@@ -63,7 +63,7 @@ def main() -> int:
             problems.append("`ptaf --version` failed")
         out = away / "report.html"
         dash = run([str(ptaf), "dashboard", "--demo", "--export", str(out)], cwd=away)
-        if dash.returncode or "PTAF Sentinel" not in (
+        if dash.returncode or "PtafLab" not in (
             out.read_text(encoding="utf-8") if out.exists() else ""
         ):
             problems.append("the dashboard page was not shipped in the install")

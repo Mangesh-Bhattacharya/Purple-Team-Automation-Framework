@@ -18,13 +18,13 @@ def _calls(path: pathlib.Path):
             if depth == 0:
                 break
             i += 1
-        yield text.count("\n", 0, match.start()) + 1, text[match.start() : i + 1]
+        yield text.count("\n", 0, match.start()) + 1, text[max(0, match.start() - 12) : i + 1]
 
 
 def test_every_text_io_call_declares_an_encoding():
     offenders = []
     for path in sorted((ROOT / "ptaf").glob("*.py")):
         for line, call in _calls(path):
-            if "encoding=" not in call and "Popen" not in call:
+            if "encoding=" not in call and "Popen" not in call and "webbrowser" not in call:
                 offenders.append(f"{path.name}:{line}: {call[:60]}")
     assert not offenders, "missing encoding=: " + "; ".join(offenders)

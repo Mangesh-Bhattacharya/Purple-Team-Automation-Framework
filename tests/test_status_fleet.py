@@ -328,6 +328,6 @@ def test_an_exported_snapshot_is_static_so_it_never_polls_a_server(tmp_path):
     assert out.exit_code == 0
     html = page.read_text(encoding="utf-8")
     assert '"static": true' in html and "!DATA.static" in html
-    assert '"static"' not in dash.render_html(
+    assert '"static": true' not in dash.render_html(
         dash.demo_summary(), None
     )  # live pages are not static
