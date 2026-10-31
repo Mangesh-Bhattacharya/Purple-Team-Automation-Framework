@@ -89,3 +89,12 @@ def test_a_rule_on_original_file_name_fires_on_a_renamed_binary(tmp_path):
     shutil.copy(src, renamed)
     event = {"Image": str(renamed), **winmeta.version_info(str(renamed))}
     assert _rule("windows").matches(event)  # matched by what it IS, not what it is called
+
+
+@pytest.mark.parametrize(
+    "raw,want",
+    [("Cmd.Exe.MUI", "Cmd.Exe"), ("PowerShell.EXE.mui", "PowerShell.EXE"), ("Cmd.Exe", "Cmd.Exe"),
+     ("notepad.exe", "notepad.exe"), ("", ""), ("mui", "mui")],
+)  # fmt: skip
+def test_the_mui_suffix_windows_adds_is_stripped_so_names_match_sysmon_and_sigma(raw, want):
+    assert winmeta.clean_original_file_name(raw) == want

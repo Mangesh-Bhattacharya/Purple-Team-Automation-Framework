@@ -28,6 +28,17 @@ FIELD_MAP = {
 FIELDS = frozenset(FIELD_MAP.values())
 
 
+def clean_original_file_name(name: str) -> str:
+    """Strip the ``.MUI`` suffix Windows adds for language-resource binaries.
+
+    On current Windows the string tables of many system binaries live in separate ``.mui`` files, and
+    the API then reports ``Cmd.Exe.MUI`` for ``cmd.exe``. Sysmon and every Sigma rule expect
+    ``Cmd.Exe``. (Found by CI on a real Windows runner: the unrenamed binary and its renamed copy
+    disagreed.)
+    """
+    return name[:-4] if name.lower().endswith(".mui") else name
+
+
 @lru_cache(maxsize=4096)
 def version_info(path: str) -> dict[str, str]:
     """``{"OriginalFileName": ..., "Description": ..., ...}`` for an executable, or ``{}``.
@@ -82,7 +93,9 @@ def version_info(path: str) -> dict[str, str]:
                 ):
                     text = ctypes.wstring_at(ptr.value, length.value).rstrip("\x00").strip()
                     if text:
-                        out[name] = text
+                        out[name] = (
+                            clean_original_file_name(text) if name == "OriginalFileName" else text
+                        )
             if len(out) == len(FIELD_MAP):
                 break
         return out
