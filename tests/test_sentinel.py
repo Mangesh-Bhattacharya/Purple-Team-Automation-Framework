@@ -1,0 +1,245 @@
+"""Tests for PTAF Sentinel: rule engine, attribution, drift, exports, safety."""
+
+import json
+
+import pytest
+
+from ptaf import state
+from ptaf.canaries import CANARIES, canaries_for
+from ptaf.collector import ProcessCollector
+from ptaf.exports import badge, navigator_layer
+from ptaf.platform_info import collect_host_info
+from ptaf.service import render
+from ptaf.sigma_lite import Rule, UnsupportedRule
+from ptaf.validation import (
+    CanaryResult,
+    EventBuffer,
+    SelfTestReport,
+    descendants,
+    load_rules,
+    rule_covers,
+    run_selftest,
+)
+
+RULE = """
+title: t
+id: x
+logsource: {category: process_creation, product: linux}
+detection:
+  sel:
+    Image|endswith: '/curl'
+    CommandLine|contains|all: ['-o', 'http']
+  filt:
+    User: root
+  condition: sel and not filt
+tags: [attack.execution, attack.t1059.004, attack.t1105]
+level: low
+"""
+
+
+def ev(**kw):
+    base = {"ProcessId": 1, "ParentProcessId": 0, "Image": "", "CommandLine": "", "User": "bob"}
+    return {**base, **kw}
+
+
+# --- rule engine ---------------------------------------------------------
+def test_rule_matches_case_insensitively_and_respects_not():
+    rule = Rule.from_yaml(RULE)
+    hit = ev(Image="/usr/bin/CURL", CommandLine="curl -o x HTTP://a")
+    assert rule.matches(hit)
+    assert not rule.matches({**hit, "User": "root"})
+    assert not rule.matches({**hit, "CommandLine": "curl -o x"})  # 'all' needs both
+
+
+def test_technique_ids_keep_subtechnique_and_skip_tactic_tags():
+    assert Rule.from_yaml(RULE).technique_ids == ["T1059.004", "T1105"]
+
+
+def test_unknown_selection_and_modifier_fail_loudly():
+    bad_cond = RULE.replace("sel and not filt", "sel and nope")
+    with pytest.raises(UnsupportedRule):
+        Rule.from_yaml(bad_cond).matches(ev())
+    bad_mod = RULE.replace("endswith", "re")
+    with pytest.raises(UnsupportedRule):
+        Rule.from_yaml(bad_mod).matches(ev())
+
+
+def test_quantified_conditions_and_parentheses():
+    text = RULE.replace("sel and not filt", "(1 of s*) and not filt").replace("sel:", "s1:")
+    rule = Rule.from_yaml(text)
+    assert rule.matches(ev(Image="/bin/curl", CommandLine="-o http"))
+
+
+def test_windows_backslash_rule_actually_matches_windows_path():
+    """Regression: the shipped rule used a doubled backslash and never matched."""
+    rules, errors = load_rules()
+    assert not errors
+    ps = next(r for r in rules if r.product == "windows")
+    event = ev(
+        Image=r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+        CommandLine="powershell.exe -NoProfile -EncodedCommand AAAA",
+    )
+    assert ps.matches(event)
+
+
+def test_rule_covers_matches_base_and_sub_techniques():
+    rule = Rule.from_yaml(RULE)
+    assert rule_covers(rule, "T1059.004") and rule_covers(rule, "T1059")
+    assert not rule_covers(rule, "T1140")
+
+
+# --- attribution ---------------------------------------------------------
+def test_descendants_follows_process_ancestry():
+    events = [
+        ev(ProcessId=10, ParentProcessId=1),
+        ev(ProcessId=11, ParentProcessId=10),
+        ev(ProcessId=12, ParentProcessId=11),
+        ev(ProcessId=99, ParentProcessId=1),
+    ]
+    assert [e["ProcessId"] for e in descendants(events, 10)] == [10, 11, 12]
+
+
+# --- drift / exports -----------------------------------------------------
+def _report(status):
+    res = CanaryResult("c1", "T1140", "n", status, ["rule A"] if status == "detected" else [])
+    return SelfTestReport({"hostname": "h"}, "now", [res], 1, [])
+
+
+def test_drift_only_when_previously_detected_now_not(tmp_path, monkeypatch):
+    monkeypatch.setenv("PTAF_HOME", str(tmp_path))
+    state.save(_report("detected"))
+    prev = state.load_previous()
+    assert state.compute_drift(prev, _report("detected")) == []
+    drift = state.compute_drift(prev, _report("missed"))
+    assert drift[0]["severity"] == "high" and drift[0]["to"] == "missed"
+    assert state.compute_drift({}, _report("missed")) == []  # first run: no baseline
+
+
+def test_badge_and_navigator_are_three_state():
+    rules = [Rule.from_yaml(RULE)]
+    assert badge(_report("detected"))["message"] == "100%"
+    assert badge(_report("missed"))["color"] == "red"
+    layer = navigator_layer(_report("missed"), rules)
+    colors = {t["techniqueID"]: t["color"] for t in layer["techniques"]}
+    assert colors["T1140"] == "#c53030"  # proven gap
+    assert colors["T1105"] == "#d4a017"  # rule exists, untested
+
+
+def test_coverage_is_none_when_nothing_testable():
+    assert _report("no_telemetry").coverage is None
+
+
+# --- safety contract -----------------------------------------------------
+FORBIDDEN = [
+    r"https?:",
+    r"\bcurl\b",
+    r"\bwget\b",
+    r"\bnc\b",
+    r"\bncat\b",
+    r"/dev/tcp",
+    r"/etc/(passwd|shadow)",
+    r"\bsudo\b",
+    r"\brm\b",
+    r">>",
+    r"mimikatz",
+    r"\bchmod\b",
+    r"\bcrontab\b",
+    r"schtasks",
+    r"\breg\b",
+]
+
+
+@pytest.mark.parametrize("canary", CANARIES, ids=lambda c: c.id)
+def test_canary_argv_is_local_and_benign(canary):
+    import re
+
+    argv = canary.build_argv("abc123")
+    assert isinstance(argv, list) and all(isinstance(a, str) for a in argv)
+    flat = " ".join(argv)
+    for bad in FORBIDDEN:
+        assert not re.search(bad, flat, re.I), f"{canary.id} matches forbidden pattern {bad!r}"
+
+
+_ALL_RULES, _ = load_rules()
+
+
+@pytest.mark.parametrize(
+    "canary,os_name",
+    [(c, o) for c in CANARIES for o in c.platforms],
+    ids=lambda v: v.id if hasattr(v, "id") else v,
+)
+def test_every_canary_fires_its_rule_on_every_supported_os(canary, os_name):
+    """Deterministic cross-OS check: modelled telemetry must trip a rule for the technique."""
+    events = canary.modeled_events(os_name, canary.build_argv("m"))
+    rules = [r for r in _ALL_RULES if r.applies_to(os_name) and rule_covers(r, canary.technique_id)]
+    assert rules, f"no {os_name} rule maps to {canary.technique_id}"
+    assert any(r.matches(e) for r in rules for e in events), f"{canary.id} not caught on {os_name}"
+
+
+BENIGN = [
+    ("/bin/ls", "ls -la /tmp"),
+    ("/usr/bin/base64", "base64 notes.txt"),
+    ("/bin/sh", "sh -c echo hello"),
+    ("/usr/bin/python3", "python3 manage.py runserver"),
+    ("/usr/bin/openssl", "openssl x509 -in cert.pem -noout"),
+    ("/usr/bin/osascript", "osascript script.scpt"),
+    ("C:\\Windows\\System32\\notepad.exe", "notepad.exe notes.txt"),
+    (
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe",
+        "powershell.exe -NoProfile -File build.ps1",
+    ),
+    ("C:\\Windows\\System32\\tasklist.exe", "tasklist.exe"),
+]
+
+
+@pytest.mark.parametrize("image,cmd", BENIGN)
+def test_ordinary_activity_does_not_trip_any_rule(image, cmd):
+    event = ev(Image=image, CommandLine=cmd)
+    for os_name in ("windows", "linux", "macos"):
+        for rule in _ALL_RULES:
+            if rule.applies_to(os_name):
+                assert not rule.matches(event), f"false positive: {rule.title} on {cmd!r}"
+
+
+def test_every_platform_has_a_canary_and_every_canary_maps_to_attack():
+    for os_name in ("windows", "linux", "macos"):
+        assert canaries_for(os_name)
+    assert all(c.technique_id.startswith("T") for c in CANARIES)
+
+
+def test_service_templates_render_for_all_platforms():
+    assert "ExecStart=" in render("linux")
+    assert "launchctl" in render("macos")
+    assert "schtasks" in render("windows")
+    with pytest.raises(ValueError):
+        render("plan9")
+
+
+# --- live integration (runs on every OS in CI) ---------------------------
+def test_collector_sees_a_new_process():
+    import subprocess
+    import sys
+    import time
+
+    buf = EventBuffer()
+    col = ProcessCollector(buf.add, interval=0.02)
+    col.start()
+    try:
+        p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(1)"])
+        time.sleep(0.6)
+        seen = [e for e in buf.since(0) if e["ProcessId"] == p.pid]
+        p.wait()
+    finally:
+        col.stop()
+    assert seen and "time.sleep" in seen[0]["CommandLine"]
+
+
+def test_live_selftest_detects_canaries_on_this_host(tmp_path, monkeypatch):
+    monkeypatch.setenv("PTAF_HOME", str(tmp_path))
+    host = collect_host_info()
+    rules, errors = load_rules()
+    report = run_selftest(rules, errors, host)
+    assert not errors and report.results
+    statuses = {r.canary_id: r.status for r in report.results}
+    # A sensor gap on an exotic CI runner is tolerated; a rule gap is not.
+    assert "missed" not in statuses.values(), json.dumps(report.to_dict(), indent=1)

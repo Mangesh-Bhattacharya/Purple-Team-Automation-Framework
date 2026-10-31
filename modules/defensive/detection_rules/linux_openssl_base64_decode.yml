@@ -1,0 +1,25 @@
+title: OpenSSL Base64 Decode (linux)
+id: b73ac855-2cb0-5b9f-a5c1-18ffca5edd05
+status: experimental
+description: >
+  Detects openssl used to decode base64, a common way to unpack staged payloads. Maps to T1140.
+references:
+  - https://attack.mitre.org/techniques/T1140/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection:
+    Image|endswith: '/openssl'
+    CommandLine|contains|all:
+      - ' enc'
+      - ' -d'
+  condition: selection
+falsepositives:
+  - Certificate and key tooling decodes base64 routinely; scope by parent or user.
+level: low
+tags:
+  - attack.defense_evasion
+  - attack.t1140

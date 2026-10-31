@@ -20,8 +20,8 @@ real room to shape the architecture, not just add small fixes.
 ## Getting started
 
 ```bash
-git clone https://github.com/Mangesh-Bhattacharya/PTAF.git
-cd PTAF
+git clone https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework.git
+cd Purple-Team-Automation-Framework
 python3 -m venv .venv
 source .venv/bin/activate   # .venv\Scripts\activate on Windows
 pip install -r requirements.txt

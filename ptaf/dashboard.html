@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PTAF Sentinel — Detection Assurance</title>
+<style>
+:root{--radius:.625rem;--background:oklch(16.47% .0203 57.05);--foreground:oklch(95.07% .0155 67.64);
+--card:oklch(22.84% .0251 63.32);--primary:oklch(78% .16 65);--primary-hover:oklch(82.76% .1293 66.47);
+--muted:oklch(24.2% .0317 59.19);--muted-foreground:oklch(85.67% .0176 67.59);--accent:oklch(29.34% .043 53.4);
+--destructive:oklch(69.8% .1698 35.2);--success:oklch(69.9% .14 150.04);--info:oklch(75% .1306 240.1);
+--border:oklch(29.34% .043 53.4);--border-emph:oklch(36.65% .0544 49.77);--term:oklch(14% .0052 86.6)}
+*{box-sizing:border-box}
+html{color-scheme:dark}
+body{margin:0;background:var(--background);color:var(--foreground);
+font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.grid-bg{position:absolute;inset:0 0 auto 0;height:900px;pointer-events:none;
+background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+background-size:56px 56px;-webkit-mask-image:radial-gradient(at 50% 0,#000 30%,#0000 75%);mask-image:radial-gradient(at 50% 0,#000 30%,#0000 75%);opacity:.55}
+.wrap{position:relative;max-width:1100px;margin:0 auto;padding:0 20px 64px}
+header{position:sticky;top:0;z-index:5;backdrop-filter:blur(14px);background:oklch(16.47% .0203 57.05/.72);border-bottom:1px solid var(--border)}
+header .in{max-width:1100px;margin:0 auto;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-size:14px;font-weight:600}.caret{color:var(--primary);animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--border-emph);background:var(--muted);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--muted-foreground)}
+.demo{background:var(--primary);color:var(--background);text-align:center;font-weight:600;font-size:13px;padding:6px}
+.hero{position:relative;display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;padding:48px 0 28px}
+.ring{width:176px;height:176px;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .num{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring .num b{font-size:40px;line-height:1}.ring .num small{display:block;color:var(--muted-foreground);font-size:12px;margin-top:4px}
+h1{font-size:clamp(24px,4vw,36px);line-height:1.15;margin:0 0 10px;letter-spacing:-.01em}
+.lede{color:var(--muted-foreground);margin:0;max-width:60ch}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--primary);margin:36px 0 12px;font-weight:600}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+.card:hover{border-color:var(--border-emph)}
+.banner{border-color:var(--destructive);background:oklch(69.8% .17 35.2/.10)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;color:var(--muted-foreground);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border)}
+td{padding:12px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.s-detected{background:oklch(69.9% .14 150/.18);color:var(--success)}
+.s-missed{background:oklch(69.8% .17 35/.2);color:var(--destructive)}
+.s-no_telemetry,.s-error{background:oklch(78% .16 65/.18);color:var(--primary)}
+.sub{color:var(--muted-foreground);font-size:13px}
+.feed{background:var(--term);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;max-height:280px;overflow:auto;font-size:12.5px}
+.feed div{padding:4px 0;border-bottom:1px dashed var(--border);word-break:break-all}.feed div:last-child{border:0}
+.empty{color:var(--muted-foreground);font-size:14px}
+.spark{width:100%;height:90px}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}dt{color:var(--muted-foreground)}dd{margin:0}
+footer{margin-top:40px;color:var(--muted-foreground);font-size:12.5px;border-top:1px solid var(--border);padding-top:16px}
+@media(max-width:640px){.hero{grid-template-columns:1fr;justify-items:start}th:nth-child(4),td:nth-child(4){display:none}}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<header><div class="in">
+  <div class="brand mono">PTAF Sentinel<span class="caret">_</span></div>
+  <div class="chips" id="chips"></div>
+</div></header>
+<div id="demo" class="demo" hidden>DEMO DATA — sample values for illustration, not a real machine</div>
+<main class="wrap">
+  <section class="hero">
+    <div class="ring" id="ring"></div>
+    <div><h1 id="verdict">Loading…</h1><p class="lede" id="lede"></p></div>
+  </section>
+
+  <div id="driftbox"></div>
+
+  <h2>What we tested</h2>
+  <div class="card" style="padding:6px 8px;overflow-x:auto"><table>
+    <thead><tr><th>Attacker behavior</th><th>Result</th><th>What it means</th><th>What to do</th></tr></thead>
+    <tbody id="rows"></tbody></table></div>
+
+  <div class="cols" style="margin-top:12px">
+    <div><h2>Protection over time</h2><div class="card" id="trend"></div></div>
+    <div><h2>This machine</h2><div class="card"><dl id="host"></dl></div></div>
+  </div>
+
+  <h2>Live detections</h2>
+  <div class="feed mono" id="feed"></div>
+  <p class="sub">Test activity from Sentinel's own safe checks is labelled <b>[test]</b> and never counted as a real alert.</p>
+
+  <h2>How to read this</h2>
+  <div class="cols">
+    <div class="card"><b>Safe tests</b><p class="sub">Sentinel imitates the <i>shape</i> of common attacker behavior with harmless local no-op commands. Nothing is stolen, changed or sent anywhere.</p></div>
+    <div class="card"><b>Why it matters</b><p class="sub">A broken detection is silent. This is the only way to know your alarms still ring before a real attacker finds out they don't.</p></div>
+    <div class="card"><b>Gap vs blind spot</b><p class="sub">A <b>gap</b> means we saw the activity but no rule fired. A <b>blind spot</b> means the sensor recorded nothing at all.</p></div>
+  </div>
+  <footer id="foot" class="mono"></footer>
+</main>
+<script id="boot" type="application/json">__PTAF_DATA__</script>
+<script>
+"use strict";
+const NS = "http://www.w3.org/2000/svg";
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function svg(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function ago(iso) { const s = (Date.now() - Date.parse(iso)) / 1000; if (!isFinite(s)) return "unknown"; if (s < 90) return "just now"; if (s < 5400) return Math.round(s / 60) + " min ago"; if (s < 129600) return Math.round(s / 3600) + " h ago"; return Math.round(s / 86400) + " d ago"; }
+
+function render(d) {
+  $("demo").hidden = !d.demo;
+  const chips = $("chips"); clear(chips);
+  const h = d.host || {};
+  [h.hostname, h.os, h.virtualization && h.virtualization !== "none" ? "VM: " + h.virtualization : "bare metal"].filter(Boolean).forEach((t) => chips.appendChild(el("span", "chip mono", t)));
+
+  const latest = d.latest, results = latest ? latest.results : [];
+  const tested = results.filter((r) => r.status === "detected" || r.status === "missed");
+  const gaps = results.filter((r) => r.status === "missed");
+  const blind = results.filter((r) => r.status === "no_telemetry" || r.status === "error");
+  const cov = latest ? latest.coverage_percent : null;
+
+  // ring
+  const ring = $("ring"); clear(ring);
+  const R = 76, C = 2 * Math.PI * R, pct = cov == null ? 0 : cov;
+  const color = cov == null ? "var(--border-emph)" : cov >= 90 ? "var(--success)" : cov >= 60 ? "var(--primary)" : "var(--destructive)";
+  const s = svg("svg", { width: 176, height: 176, viewBox: "0 0 176 176", role: "img", "aria-label": "Verified detection coverage" });
+  s.appendChild(svg("circle", { cx: 88, cy: 88, r: R, fill: "none", stroke: "var(--accent)", "stroke-width": 12 }));
+  s.appendChild(svg("circle", { cx: 88, cy: 88, r: R, fill: "none", stroke: color, "stroke-width": 12, "stroke-linecap": "round", "stroke-dasharray": (C * pct / 100) + " " + C }));
+  ring.appendChild(s);
+  const num = el("div", "num"), box = el("div");
+  box.appendChild(el("b", "mono", cov == null ? "n/a" : cov + "%")); box.appendChild(el("small", null, "verified coverage"));
+  num.appendChild(box); ring.appendChild(num);
+
+  // verdict
+  if (!latest) { $("verdict").textContent = "No results yet"; $("lede").textContent = "Run “ptaf selftest” (or start “ptaf monitor”) and this page will fill in."; }
+  else if (gaps.length) { $("verdict").textContent = gaps.length + " of " + tested.length + " tested attacker behaviors went undetected."; $("lede").textContent = "These are real holes: we safely imitated the behavior and nothing alerted. Details and fixes are below."; }
+  else if (blind.length) { $("verdict").textContent = "No gaps found, but " + blind.length + " check" + (blind.length > 1 ? "s" : "") + " could not be verified."; $("lede").textContent = "Everything we could test was caught. The remaining checks need a working sensor on this machine."; }
+  else { $("verdict").textContent = "All " + tested.length + " tested attacker behaviors were detected."; $("lede").textContent = "Your detections fired on every safe test. This is re-checked automatically so a silent failure can't hide."; }
+
+  // drift
+  const db = $("driftbox"); clear(db);
+  (d.drift || []).slice(-3).reverse().forEach((x) => {
+    const c = el("div", "card banner"); c.style.marginBottom = "8px";
+    c.appendChild(el("b", null, "Something changed: " + x.technique_id + " used to be caught, now it is not."));
+    c.appendChild(el("div", "sub", "Was " + x.from + ", now " + x.to + " · " + ago(x.time) + ". A rule, log pipeline or sensor likely changed."));
+    db.appendChild(c);
+  });
+
+  // table
+  const rows = $("rows"); clear(rows);
+  results.forEach((r) => {
+    const ex = d.explain[r.status] || { label: r.status, meaning: "", action: "" };
+    const tr = el("tr"), t1 = el("td");
+    t1.appendChild(el("div", null, r.name)); t1.appendChild(el("div", "sub mono", r.technique_id));
+    const t2 = el("td"); t2.appendChild(el("span", "tag s-" + r.status, ex.label));
+    tr.appendChild(t1); tr.appendChild(t2); tr.appendChild(el("td", "sub", ex.meaning)); tr.appendChild(el("td", "sub", ex.action));
+    rows.appendChild(tr);
+  });
+  if (!results.length) { const tr = el("tr"), td = el("td", "empty", "Nothing tested yet."); td.colSpan = 4; tr.appendChild(td); rows.appendChild(tr); }
+
+  // trend
+  const tr = $("trend"); clear(tr);
+  const pts = (d.trend || []).filter((p) => p.coverage != null);
+  if (pts.length < 2) tr.appendChild(el("div", "empty", "Trend appears after two or more checks."));
+  else {
+    const W = 400, H = 90, step = W / (pts.length - 1);
+    const sp = svg("svg", { class: "spark", viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", role: "img", "aria-label": "Coverage trend" });
+    const path = pts.map((p, i) => (i ? "L" : "M") + (i * step).toFixed(1) + " " + (H - 6 - (H - 12) * p.coverage / 100).toFixed(1)).join(" ");
+    sp.appendChild(svg("path", { d: path, fill: "none", stroke: "var(--primary)", "stroke-width": 2.5, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }));
+    tr.appendChild(sp); tr.appendChild(el("div", "sub", pts.length + " checks · latest " + pts[pts.length - 1].coverage + "%"));
+  }
+
+  // host
+  const dl = $("host"); clear(dl);
+  [["Name", h.hostname], ["System", h.os_version], ["Architecture", h.arch], ["Virtualization", h.virtualization === "none" ? "None (bare metal)" : h.virtualization], ["Container", h.container || "No"], ["Rules loaded", latest ? latest.rules_loaded : "—"], ["Last check", latest ? ago(latest.started) : "never"]]
+    .forEach(([k, v]) => { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v == null ? "—" : String(v))); });
+
+  // feed (attacker-controlled strings: textContent only)
+  const feed = $("feed"); clear(feed);
+  const al = (d.alerts || []).slice(-40).reverse();
+  if (!al.length) feed.appendChild(el("div", "empty", "No detections yet. That is good news if nothing suspicious has run."));
+  al.forEach((a) => feed.appendChild(el("div", null, (a.synthetic ? "[test] " : "") + (a.time || "").slice(11, 19) + "  " + a.rule + " (" + a.level + ")  " + (a.command_line || ""))));
+
+  $("foot").textContent = "Generated " + ago(d.generated) + " · PTAF Sentinel · read-only, runs locally, no data leaves this machine";
+}
+
+const boot = JSON.parse($("boot").textContent);
+render(boot);
+if (location.protocol.startsWith("http")) {
+  setInterval(() => fetch("/api/summary", { cache: "no-store" }).then((r) => r.json()).then(render).catch(() => {}), 5000);
+}
+</script>
+</body>
+</html>

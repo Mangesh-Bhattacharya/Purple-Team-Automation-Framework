@@ -1,0 +1,22 @@
+title: System Information Discovery via systeminfo (windows)
+id: 07bdd6fd-5011-53c6-a6ac-00ea0d786adc
+status: experimental
+description: >
+  Detects systeminfo.exe, commonly run early in an intrusion for host reconnaissance. Maps to T1082.
+references:
+  - https://attack.mitre.org/techniques/T1082/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    Image|endswith: '\systeminfo.exe'
+  condition: selection
+falsepositives:
+  - Admins and inventory tools run systeminfo; baseline before alerting.
+level: informational
+tags:
+  - attack.discovery
+  - attack.t1082

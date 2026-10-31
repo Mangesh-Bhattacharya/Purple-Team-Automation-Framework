@@ -1,0 +1,23 @@
+title: Verbose Process Listing via tasklist (windows)
+id: 384c0558-6d52-53f2-8449-1ad5a43ec302
+status: experimental
+description: >
+  Detects tasklist /v, used to enumerate running processes and their owners. Maps to T1057.
+references:
+  - https://attack.mitre.org/techniques/T1057/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    Image|endswith: '\tasklist.exe'
+    CommandLine|contains: '/v'
+  condition: selection
+falsepositives:
+  - Support staff and scripts list processes routinely.
+level: informational
+tags:
+  - attack.discovery
+  - attack.t1057

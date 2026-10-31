@@ -1,0 +1,23 @@
+title: AppleScript Run From Command Line (macos)
+id: d4e26c56-24f8-5e75-8801-28533f95f0d8
+status: experimental
+description: >
+  Detects osascript -e execution, a common macOS scripting path for adversaries. Maps to T1059.002.
+references:
+  - https://attack.mitre.org/techniques/T1059/002/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: macos
+detection:
+  selection:
+    Image|endswith: '/osascript'
+    CommandLine|contains: ' -e '
+  condition: selection
+falsepositives:
+  - Automation and installer scripts call osascript routinely.
+level: low
+tags:
+  - attack.execution
+  - attack.t1059.002

@@ -26,13 +26,13 @@ jobs:
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Lint (flake8)
-        run: flake8 modules tests --max-line-length=100 --extend-ignore=E203 || true
+        run: flake8 modules ptaf tests --max-line-length=100 --extend-ignore=E203 || true
 
       - name: Format check (black)
-        run: black --check modules tests || true
+        run: black --check -l 100 ptaf tests || true
 
       - name: Security scan (bandit)
-        run: bandit -r modules -ll || true
+        run: bandit -r modules ptaf -ll
 
       - name: Validate Sigma / YAML rule syntax
         run: |
@@ -52,8 +52,13 @@ jobs:
           PY
 
   test:
-    name: Run test suite
-    runs-on: ubuntu-latest
+    name: Tests (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.10", "3.12"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -61,13 +66,16 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python }}
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          pip install pytest
+          pip install -r requirements.txt pytest
 
       - name: Run tests
         run: pytest -v
+
+      - name: Sentinel self-test (real canaries on this runner)
+        shell: bash
+        run: python -m ptaf selftest

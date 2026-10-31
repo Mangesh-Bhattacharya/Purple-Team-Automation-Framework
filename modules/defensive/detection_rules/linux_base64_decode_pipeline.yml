@@ -1,0 +1,30 @@
+title: Base64 Decode Utility Executed (linux)
+id: 3b7f0c52-6d1e-4c1a-8d0e-example00002
+status: experimental
+description: >
+  Detects the base64 utility being run in decode mode. Attackers use it to
+  unpack staged payloads and obfuscated commands. Maps to MITRE ATT&CK T1140
+  (Deobfuscate/Decode Files or Information).
+references:
+  - https://attack.mitre.org/techniques/T1140/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection_image:
+    Image|endswith: '/base64'
+  selection_decode:
+    CommandLine|contains:
+      - ' -d'
+      - ' -D'
+      - '--decode'
+  condition: selection_image and selection_decode
+falsepositives:
+  - Package managers, CI jobs and developer tooling decode base64 routinely.
+    Scope by parent process or user before alerting on this broadly.
+level: low
+tags:
+  - attack.defense_evasion
+  - attack.t1140

@@ -18,8 +18,8 @@ logsource:
 detection:
   selection:
     Image|endswith:
-      - '\\powershell.exe'
-      - '\\pwsh.exe'
+      - '\powershell.exe'
+      - '\pwsh.exe'
     CommandLine|contains:
       - '-EncodedCommand'
       - '-enc '
