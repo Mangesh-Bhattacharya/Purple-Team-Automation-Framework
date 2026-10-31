@@ -416,13 +416,19 @@ def demo_fleet() -> dict[str, Any]:
 
 
 def render_html(
-    summary: dict[str, Any] | None, fleet: dict[str, Any] | None = None, auth: bool = False
+    summary: dict[str, Any] | None,
+    fleet: dict[str, Any] | None = None,
+    auth: bool = False,
+    static: bool = False,
 ) -> str:
     """Embed data in the template. ``<`` is escaped so data cannot close the script tag.
 
     With ``auth`` the page ships with NO data; it fetches it using the access token.
+    With ``static`` (exported snapshots) the page never polls a server, wherever it is hosted.
     """
-    payload = {"auth": True} if auth else {"summary": summary, "fleet": fleet}
+    payload: dict[str, Any] = {"auth": True} if auth else {"summary": summary, "fleet": fleet}
+    if static and not auth:
+        payload["static"] = True
     blob = json.dumps(payload).replace("<", "\\u003c")
     return TEMPLATE.read_text(encoding="utf-8").replace("__PTAF_DATA__", blob)
 

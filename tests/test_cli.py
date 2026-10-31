@@ -155,3 +155,20 @@ def test_a_malformed_rule_file_is_reported_not_fatal(tmp_path):
     (tmp_path / "list.yml").write_text("- just\n- a list\n", encoding="utf-8")
     rules_, errors = load_rules(tmp_path)  # must not raise
     assert rules_ == [] and len(errors) == 3
+
+
+def test_build_script_can_make_a_folder_build_and_defaults_to_one_file():
+    """macOS needs --onedir (a one-file app re-unpacks and is re-scanned on every launch: ~14 s)."""
+    import importlib.util
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "packaging" / "build.py"
+    spec = importlib.util.spec_from_file_location("ptaf_build", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert "--onefile" in mod.build_command() and "--onedir" not in mod.build_command()
+    assert "--onedir" in mod.build_command(onedir=True) and "--onefile" not in mod.build_command(
+        True
+    )
+    cmd = " ".join(mod.build_command(True))
+    assert "ptaf/rules" in cmd and "dashboard.html" in cmd  # the rules still ship in the app

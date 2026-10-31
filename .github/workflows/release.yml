@@ -23,12 +23,16 @@ jobs:
           python-version: "3.12"
       - name: Install build dependencies
         run: pip install -r requirements.txt pyinstaller
-      - name: Build single-file executable
-        run: python packaging/build.py
+      - name: Build the application
+        shell: bash
+        # macOS uses a folder build: a single file re-unpacks (and the OS re-scans it) on every launch,
+        # which measured ~14 s per command versus ~0.3 s for a folder.
+        run: |
+          if [ "${{ matrix.os }}" = "macos-latest" ]; then python packaging/build.py --onedir; else python packaging/build.py; fi
       - name: Smoke-test the frozen app (real canaries)
         shell: bash
         run: |
-          exe=dist/ptaf; [ -f dist/ptaf.exe ] && exe=dist/ptaf.exe
+          exe=dist/ptaf; [ -f dist/ptaf.exe ] && exe=dist/ptaf.exe; [ -d dist/ptaf ] && exe=dist/ptaf/ptaf
           "$exe" --version
           "$exe" selftest
       - name: Name and checksum
@@ -37,7 +41,7 @@ jobs:
           mkdir out
           case "${{ matrix.os }}" in
             ubuntu-latest)  cp dist/ptaf out/ptaf-linux-x86_64 ;;
-            macos-latest)   cp dist/ptaf out/ptaf-macos-arm64 ;;
+            macos-latest)   tar -czf out/ptaf-macos-arm64.tar.gz -C dist ptaf ;;
             windows-latest) cp dist/ptaf.exe out/ptaf-windows-x86_64.exe ;;
           esac
           cd out && (sha256sum * 2>/dev/null || shasum -a 256 *) > "SHA256SUMS-${{ matrix.os }}.txt"

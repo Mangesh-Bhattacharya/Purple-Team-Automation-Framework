@@ -70,6 +70,12 @@ def one_round(rnd: int, base: list[str], res: Results) -> None:
     home = tempfile.mkdtemp(prefix="ptaf-verify-")
     env = {**os.environ, "PTAF_HOME": home}
     print(f"\n=== round {rnd} (state: {home})")
+    if rnd == 1 and len(base) == 1:  # a built app: its very first launch can take ~14 s on macOS
+        print("  (warming up the application: the OS scans a new unsigned build on first launch)")
+        try:
+            run(base + ["--version"], env, timeout=180)
+        except subprocess.TimeoutExpired:
+            pass
 
     def check(name: str, args: list[str], ok_codes=(0,), json_out=False, validator=None):
         started = time.monotonic()
@@ -145,7 +151,7 @@ def one_round(rnd: int, base: list[str], res: Results) -> None:
     )
     try:
         body = b""
-        for _ in range(40):
+        for _ in range(240 if len(base) == 1 else 40):  # a built app starts more slowly
             try:
                 body = urllib.request.urlopen(  # nosec B310 - loopback only
                     f"http://127.0.0.1:{port}/api/summary", timeout=2

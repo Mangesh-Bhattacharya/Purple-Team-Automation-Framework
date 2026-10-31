@@ -319,3 +319,15 @@ def test_the_rules_ship_inside_the_package():
     assert len(list(DEFAULT_RULES_DIR.glob("*.yml"))) >= 21
     pyproject = (pathlib.Path(ptaf.__file__).resolve().parents[1] / "pyproject.toml").read_text()
     assert "rules/*.yml" in pyproject and "dashboard.html" in pyproject
+
+
+def test_an_exported_snapshot_is_static_so_it_never_polls_a_server(tmp_path):
+    """Hosted on any web server, a snapshot must not poll /api/summary (false 'cannot reach')."""
+    page = tmp_path / "snap.html"
+    out = CliRunner().invoke(cli.main, ["dashboard", "--demo", "--export", str(page)])
+    assert out.exit_code == 0
+    html = page.read_text(encoding="utf-8")
+    assert '"static": true' in html and "!DATA.static" in html
+    assert '"static"' not in dash.render_html(
+        dash.demo_summary(), None
+    )  # live pages are not static
