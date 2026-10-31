@@ -54,8 +54,11 @@ Honesty is part of the product:
 - Ten canaries ship today. Coverage percentages only count techniques that have a
   canary, and the dashboard says so.
 - Only process-creation rules are evaluated so far.
-- Verified live on macOS only so far (6 of 6 canaries detected). Windows and Linux are
-  covered by modelled-telemetry tests; <fill in after the CI matrix runs>.
+- CI runs the real canaries on GitHub-hosted Ubuntu, Windows and macOS runners and they
+  pass. Getting there took real fixes the tests alone never would have found: Windows'
+  default text encoding, a fork-versus-exec race in the collector, and a canary that
+  behaved differently on a loaded macOS runner. I'd rather you read that than assume it
+  just worked.
 
 ## Try it, break it, extend it
 

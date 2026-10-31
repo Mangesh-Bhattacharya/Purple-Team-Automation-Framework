@@ -67,6 +67,7 @@ review, never installed automatically.
   rules raise loudly instead of silently never matching.
 * 10 canaries and 15 rules ship today (Windows 4, Linux/macOS 5 shared + 1 macOS-only).
   Coverage % is only over techniques that have a canary.
-* Verification status, stated plainly: on macOS all 6 applicable canaries were run live
-  and detected. Windows and Linux are verified only by a modelled-telemetry test (every
-  canary's expected events trip its rule) until the CI matrix runs the real canaries there.
+* Verification status, stated plainly: CI runs the real canaries on GitHub-hosted Ubuntu,
+  Windows and macOS runners (Python 3.10 and 3.12) and all pass. That is hosted VMs, not a
+  fleet: results on hardened or EDR-protected endpoints may differ, which is the point of
+  running it there. A missed canary is retried once; a retry-only success is flagged.
