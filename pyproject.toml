@@ -9,7 +9,29 @@ description = "PTAF Sentinel: continuously prove your detections still fire (Win
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{ name = "Mangesh Bhattacharya" }]
+keywords = ["detection-engineering", "purple-team", "sigma", "mitre-attack", "security-validation", "blue-team", "kali"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Information Technology",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Security",
+  "Topic :: System :: Monitoring",
+]
 dependencies = ["pyyaml", "click", "psutil"]
+
+[project.urls]
+Homepage = "https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework"
+Source = "https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework"
+Issues = "https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/issues"
+Changelog = "https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/blob/main/CHANGELOG.md"
 
 [project.scripts]
 ptaf = "ptaf.cli:main"

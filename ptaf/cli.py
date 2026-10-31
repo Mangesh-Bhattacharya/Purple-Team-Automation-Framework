@@ -19,6 +19,7 @@ from .service import render
 from .canaries import CANARIES, CANARY_TAG, canaries_for, unknown_ids
 from .sensor import MODES, SensorUnavailable, default_mode
 from .doctor import exit_code as doctor_exit
+from .legal import ACCEPTABLE_USE, NOTICE
 from .doctor import run_checks
 from .reports import EXIT_LOCKED, EXIT_SENSOR, exit_code_for, to_junit
 from .sigma_lite import check_rule
@@ -188,6 +189,12 @@ def doctor(rules_dir, collector, as_json: bool) -> None:
 
 
 @main.command()
+def legal() -> None:
+    """Show the license, acceptable-use and privacy notice."""
+    click.echo(NOTICE)
+
+
+@main.command()
 @click.option("--json-out", "as_json", is_flag=True)
 @click.option(
     "--all-platforms", is_flag=True, help="List canaries for every OS, not just this one."
@@ -212,7 +219,7 @@ def canaries(as_json: bool, all_platforms: bool) -> None:
     if as_json:
         click.echo(json.dumps({"tag": CANARY_TAG, "canaries": rows}, indent=2))
         return
-    click.echo(f"Canary tag for SOC filters: {CANARY_TAG}\n")
+    click.echo(f"{ACCEPTABLE_USE}\nCanary tag for SOC filters: {CANARY_TAG}\n")
     for r in rows:
         click.echo(f"{r['id']}  [{r['technique']}]  {','.join(r['platforms'])}")
         click.echo(f"    {r['description']}")
@@ -346,6 +353,7 @@ def up(rules_dir, only, skip, collector, host, port, interval, token, no_browser
         thread.start()
     url = f"http://{host}:{port}/" + ("#token=" + token if token else "")
     click.echo("PTAF Sentinel is running.")
+    click.echo(f"  Notice    : {ACCEPTABLE_USE}")
     click.echo(f"  Dashboard : {url}")
     click.echo("  First results appear in roughly 10-20 seconds; the page then updates live.")
     click.echo("  Stop with Ctrl-C.")

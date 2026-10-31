@@ -48,6 +48,12 @@ pytest
 - **Docs:** improvements to `docs/` and module READMEs are always welcome,
   even without code changes.
 
+## Licensing of contributions
+
+By contributing you agree your work is licensed under the project's MIT License and that you have the
+right to submit it. Please sign off your commits (`git commit -s`). Do not copy code or rules from
+incompatible sources. See [COPYRIGHT.md](COPYRIGHT.md).
+
 ## Pull request process
 
 1. Fork the repo and create a branch from `main`.

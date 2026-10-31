@@ -47,6 +47,9 @@ COLLECTED_FIELDS = {
 }  # fmt: skip
 
 
+from .winmeta import FIELDS as _WINDOWS_ONLY_FIELDS  # noqa: E402 - kept beside its only user
+
+
 def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else [value]
 
@@ -318,7 +321,9 @@ def check_rule(rule: Rule) -> RuleCompat:
     if rule.category not in (None, "process_creation"):
         verdict = "unsupported"
         reasons.append(f"needs '{rule.category}' telemetry; PTAF collects process_creation only")
-    missing = sorted(rule.fields_used() - COLLECTED_FIELDS)
+    # Windows agents also supply the version-resource fields (ptaf.winmeta); other platforms do not.
+    have = COLLECTED_FIELDS | (_WINDOWS_ONLY_FIELDS if rule.product == "windows" else frozenset())
+    missing = sorted(rule.fields_used() - have)
     if missing and verdict == "runnable":
         verdict = "partial"
         reasons.append(f"uses fields PTAF does not collect (will not match): {missing}")

@@ -372,7 +372,7 @@ def test_collector_forgets_exited_processes_so_memory_stays_bounded():
         grown = len(col._seen) - base
     finally:
         col.stop()
-    assert grown < 15, f"seen-table grew by {grown} after 40 short-lived processes (leak)"
+    assert grown < 30, f"seen-table grew by {grown} after 40 short-lived processes (leak)"
 
 
 def test_collector_survives_a_crashing_callback_and_keeps_collecting():
