@@ -17,6 +17,15 @@ ptaf dashboard --export report.html   # one self-contained file to send to a cli
 ptaf service --os linux   # print a systemd unit / launchd plist / schtasks command to review
 ```
 
+## Run it as an application (no Python needed)
+
+`python packaging/build.py` builds a single self-contained `dist/ptaf` for the OS you run it on
+(`dist/ptaf.exe` on Windows). Tagging a release (`v*`) builds Linux, macOS and Windows binaries
+in CI, smoke-tests each with real canaries, and attaches them with SHA-256 checksums.
+Binaries are **not code-signed yet**: macOS Gatekeeper and Windows SmartScreen will warn, so
+verify the checksum, or build from source. Canaries that need an interpreter (the Python one)
+are skipped, never counted as gaps, when none is installed.
+
 State and alerts live in `~/.ptaf` (override with `PTAF_HOME`): `alerts.jsonl`,
 `history.jsonl`, `state.json`, `badge.json`, `navigator_layer.json`.
 

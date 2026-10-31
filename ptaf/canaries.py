@@ -54,9 +54,11 @@ class Canary:
     description: str
     build_argv: Callable[[str], list[str]]  # marker -> argv
     modeled_events: Callable[[str, list[str]], list[Event]]  # (os, argv) -> events
+    # A canary whose prerequisite is missing is SKIPPED, never reported as a detection gap.
+    precondition: Callable[[], bool] = lambda: True
 
     def available_on(self, os_name: str) -> bool:
-        return os_name in self.platforms
+        return os_name in self.platforms and self.precondition()
 
 
 def _b64(text: str) -> str:
@@ -112,14 +114,23 @@ def _unix_history_evasion(_m: str) -> list[str]:
     return _sh("HISTFILE=/dev/null; sleep 1")
 
 
+def _python_exe() -> str | None:
+    """A real Python interpreter. In a frozen app sys.executable is ptaf itself, which would
+    run the canary under the wrong image name and look like a false detection gap."""
+    if getattr(sys, "frozen", False):
+        return shutil.which("python3") or shutil.which("python")
+    return sys.executable or shutil.which("python3")
+
+
 def _unix_python_inline_b64(_m: str) -> list[str]:
     code = "import base64,time; base64.b64decode('cHRhZg=='); time.sleep(1)"
-    return [sys.executable or shutil.which("python3") or "python3", "-c", code]
+    return [_python_exe() or "python3", "-c", code]
 
 
 def _preload_argv(var: str) -> list[str]:
-    # The trailing ':' stops the shell exec-ing sleep directly (which would hide this cmdline).
-    return _sh(f"{var}=/nonexistent/ptaf-canary.so sleep 1; :")
+    # Prefixing the ':' builtin keeps the variable in the command line without involving the
+    # dynamic loader (some binaries abort on a missing preload library, ending the canary early).
+    return _sh(f"{var}=/nonexistent/ptaf-canary.so :; sleep 1")
 
 
 def _unix_preload_env(_m: str) -> list[str]:
@@ -231,6 +242,7 @@ CANARIES: tuple[Canary, ...] = (
         "python -c that decodes a constant string and sleeps.",
         _unix_python_inline_b64,
         _m_single(unix_image="/usr/bin/python3"),
+        precondition=lambda: _python_exe() is not None,
     ),
     Canary(
         "unix-preload-env",

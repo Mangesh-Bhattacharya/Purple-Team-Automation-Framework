@@ -32,3 +32,8 @@ reports/*.json
 .pytest_cache/
 .coverage
 htmlcov/
+
+# PyInstaller output
+/dist/
+/build/
+*.spec

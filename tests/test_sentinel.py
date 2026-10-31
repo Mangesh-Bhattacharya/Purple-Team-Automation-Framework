@@ -1,6 +1,7 @@
 """Tests for PTAF Sentinel: rule engine, attribution, drift, exports, safety."""
 
 import json
+import sys
 
 import pytest
 
@@ -243,3 +244,32 @@ def test_live_selftest_detects_canaries_on_this_host(tmp_path, monkeypatch):
     statuses = {r.canary_id: r.status for r in report.results}
     # A sensor gap on an exotic CI runner is tolerated; a rule gap is not.
     assert "missed" not in statuses.values(), json.dumps(report.to_dict(), indent=1)
+
+
+def test_canary_with_missing_prerequisite_is_skipped_not_reported_as_a_gap(monkeypatch):
+    from ptaf import canaries
+
+    assert any(c.id == "unix-python-inline-base64" for c in canaries.canaries_for("linux"))
+    monkeypatch.setattr(canaries, "_python_exe", lambda: None)
+    assert not any(c.id == "unix-python-inline-base64" for c in canaries.canaries_for("linux"))
+    assert canaries.canaries_for("linux")  # the rest still run
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="os.execv semantics differ on Windows")
+def test_collector_reports_a_process_whose_identity_changes_after_exec():
+    import subprocess
+    import time
+
+    code = "import os,time; time.sleep(0.5); os.execv('/bin/sleep', ['sleep', '2'])"
+    buf = EventBuffer()
+    col = ProcessCollector(buf.add, interval=0.02)
+    col.start()
+    try:
+        p = subprocess.Popen([sys.executable, "-c", code])
+        time.sleep(1.5)
+        cmds = [e["CommandLine"] for e in buf.since(0) if e["ProcessId"] == p.pid]
+        p.wait()
+    finally:
+        col.stop()
+    assert any("os.execv" in c for c in cmds), cmds  # pre-exec identity
+    assert any(c.startswith("sleep 2") for c in cmds), cmds  # post-exec identity

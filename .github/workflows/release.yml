@@ -1,0 +1,52 @@
+name: Release binaries
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ptaf (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install build dependencies
+        run: pip install -r requirements.txt pyinstaller
+      - name: Build single-file executable
+        run: python packaging/build.py
+      - name: Smoke-test the frozen app (real canaries)
+        shell: bash
+        run: |
+          exe=dist/ptaf; [ -f dist/ptaf.exe ] && exe=dist/ptaf.exe
+          "$exe" --version
+          "$exe" selftest
+      - name: Name and checksum
+        shell: bash
+        run: |
+          mkdir out
+          case "${{ matrix.os }}" in
+            ubuntu-latest)  cp dist/ptaf out/ptaf-linux-x86_64 ;;
+            macos-latest)   cp dist/ptaf out/ptaf-macos-arm64 ;;
+            windows-latest) cp dist/ptaf.exe out/ptaf-windows-x86_64.exe ;;
+          esac
+          cd out && (sha256sum * 2>/dev/null || shasum -a 256 *) > "SHA256SUMS-${{ matrix.os }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ptaf-${{ matrix.os }}
+          path: out/*
+      - name: Attach to GitHub Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: out/*

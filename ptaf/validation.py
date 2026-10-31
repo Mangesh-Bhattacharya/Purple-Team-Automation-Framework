@@ -16,6 +16,7 @@ error          the canary could not be launched
 from __future__ import annotations
 
 import subprocess  # nosec B404 - canary argv comes only from canaries.py
+import sys
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -28,9 +29,14 @@ from .collector import Event, ProcessCollector
 from .platform_info import HostInfo
 from .sigma_lite import Rule, UnsupportedRule
 
-DEFAULT_RULES_DIR = (
-    Path(__file__).resolve().parents[1] / "modules" / "defensive" / "detection_rules"
-)
+
+def _bundle_root() -> Path:
+    """Repo root when run from source; PyInstaller's extraction dir when frozen."""
+    frozen = getattr(sys, "_MEIPASS", None)
+    return Path(frozen) if frozen else Path(__file__).resolve().parents[1]
+
+
+DEFAULT_RULES_DIR = _bundle_root() / "modules" / "defensive" / "detection_rules"
 
 
 def load_rules(rules_dir: Path | None = None) -> tuple[list[Rule], list[str]]:
