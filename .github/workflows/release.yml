@@ -54,3 +54,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: out/*
+          prerelease: true          # v0.x is a beta: say so on the release page
+          generate_release_notes: true

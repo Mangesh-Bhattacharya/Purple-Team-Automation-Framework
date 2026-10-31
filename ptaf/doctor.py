@@ -22,7 +22,7 @@ from .canaries import CANARIES, canaries_for
 from .platform_info import collect_host_info
 from .sensor import SensorUnavailable, make_collector
 from .sigma_lite import check_rule
-from .validation import EventBuffer, load_rules
+from .validation import EventBuffer, child_env, load_rules
 
 OK, WARN, FAIL = "ok", "warn", "fail"
 
@@ -83,8 +83,9 @@ def _sensor_smoke(mode: str) -> Check:
     col.start()
     try:
         proc = subprocess.Popen(  # nosec B603 - constant argv
-            argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
-        )
+            argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+            env=child_env(),
+        )  # fmt: skip
         deadline = time.monotonic() + 3
         seen = False
         while time.monotonic() < deadline and not seen:

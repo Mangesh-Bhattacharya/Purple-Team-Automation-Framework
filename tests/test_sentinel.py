@@ -443,3 +443,80 @@ def test_second_monitor_is_refused_and_stale_lock_is_taken_over(tmp_path, monkey
     assert lock.read_text(encoding="utf-8").strip().isdigit()
     state.release_lock(lock)
     assert not lock.exists()
+
+
+def _scripted(monkeypatch, statuses):
+    from ptaf import validation
+
+    calls = []
+
+    def fake(canary, rules, host, buffer, **kw):
+        calls.append(1)
+        st = statuses[min(len(calls) - 1, len(statuses) - 1)]
+        return CanaryResult(canary.id, canary.technique_id, canary.name, st, detail="sensor gap")
+
+    monkeypatch.setattr(validation, "_run_canary_once", fake)
+    return validation, calls
+
+
+def _event_canary():
+    from ptaf.canaries import CANARIES
+
+    return next(c for c in CANARIES if c.min_sensor == "event")
+
+
+def test_a_lost_race_on_a_millisecond_lived_tool_is_retried_and_reported_honestly(monkeypatch):
+    validation, calls = _scripted(monkeypatch, ["no_telemetry", "no_telemetry", "detected"])
+    res = validation.run_canary(_event_canary(), [], collect_host_info(), EventBuffer())
+    assert res.status == "detected" and len(calls) == 3
+    assert "lost the race" in res.detail  # the flakiness stays visible
+
+
+def test_a_genuinely_blind_sensor_still_reports_blind_after_the_retries(monkeypatch):
+    validation, calls = _scripted(monkeypatch, ["no_telemetry"])
+    res = validation.run_canary(_event_canary(), [], collect_host_info(), EventBuffer())
+    assert res.status == "no_telemetry" and len(calls) == 1 + validation.RACE_RETRIES
+
+
+def test_other_canaries_are_not_retried_on_no_telemetry(monkeypatch):
+    from ptaf.canaries import CANARIES
+
+    validation, calls = _scripted(monkeypatch, ["no_telemetry"])
+    core = next(c for c in CANARIES if c.min_sensor == "any")
+    assert (
+        validation.run_canary(core, [], collect_host_info(), EventBuffer()).status == "no_telemetry"
+    )
+    assert len(calls) == 1  # a sensor that sees nothing for a long-lived canary is a real problem
+
+
+def test_a_no_telemetry_result_says_whether_the_tool_ran_and_how_it_exited(monkeypatch):
+    """A tool that failed to start must be distinguishable from a blind sensor."""
+    import sys
+
+    from ptaf import canaries, validation
+    from ptaf.canaries import Canary
+
+    c = canaries.CANARIES[0]
+    quick = Canary(
+        id="q", technique_id="T1", name="q", tactic="x", platforms=(), description="",
+        build_argv=lambda m: [sys.executable, "-c", "import sys; sys.exit(7)"],
+        modeled_events=c.modeled_events,
+    )  # fmt: skip
+    # an empty buffer that never receives events: the sensor "sees nothing"
+    res = validation._run_canary_once(quick, [], collect_host_info(), EventBuffer(), settle=0.05)
+    assert res.status == "no_telemetry" and "exited with code 7" in res.detail
+
+
+def test_children_of_a_packaged_app_get_the_original_library_path_not_the_bundles(monkeypatch):
+    """PyInstaller points LD_LIBRARY_PATH at its bundle; tools launched from it then exit 127."""
+    from ptaf import validation
+
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/bundle/_MEI123")
+    monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", "/the/users/own")
+    assert validation.child_env()["LD_LIBRARY_PATH"] == "/bundle/_MEI123"  # not frozen: untouched
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert validation.child_env()["LD_LIBRARY_PATH"] == "/the/users/own"  # restored
+    monkeypatch.delenv("LD_LIBRARY_PATH_ORIG")
+    assert "LD_LIBRARY_PATH" not in validation.child_env()  # it was the bundle's own: removed
+    monkeypatch.setenv("PATH", "/usr/bin")
+    assert validation.child_env()["PATH"] == "/usr/bin"  # everything else is passed through
