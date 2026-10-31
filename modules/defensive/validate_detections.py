@@ -46,7 +46,7 @@ def _extract_technique_ids(tags: list[str]) -> list[str]:
 def check_rule(path: pathlib.Path) -> RuleCheckResult:
     errors: list[str] = []
     try:
-        data = yaml.safe_load(path.read_text())
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         return RuleCheckResult(path=path, ok=False, errors=[f"YAML parse error: {exc}"])
 
@@ -71,7 +71,7 @@ def check_rule(path: pathlib.Path) -> RuleCheckResult:
 def load_known_technique_ids() -> set[str]:
     if not ATTACK_TECHNIQUES_FILE.exists():
         return set()
-    data = yaml.safe_load(ATTACK_TECHNIQUES_FILE.read_text()) or {}
+    data = yaml.safe_load(ATTACK_TECHNIQUES_FILE.read_text(encoding="utf-8")) or {}
     return {entry["id"] for entry in data.get("techniques", []) if "id" in entry}
 
 

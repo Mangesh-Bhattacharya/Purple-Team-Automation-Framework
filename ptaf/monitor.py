@@ -108,9 +108,11 @@ class Monitor:
             item.update(host=self.host.hostname, time=datetime.now(timezone.utc).isoformat())
             self._emit(item)
         state.save(report)
-        (state.state_dir() / "badge.json").write_text(json.dumps(badge(report), indent=2))
+        (state.state_dir() / "badge.json").write_text(
+            json.dumps(badge(report), indent=2), encoding="utf-8"
+        )
         (state.state_dir() / "navigator_layer.json").write_text(
-            json.dumps(navigator_layer(report, self.all_rules), indent=2)
+            json.dumps(navigator_layer(report, self.all_rules), indent=2), encoding="utf-8"
         )
         self._emit(
             {

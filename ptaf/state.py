@@ -28,7 +28,7 @@ def _state_file() -> Path:
 
 def load_previous() -> dict[str, str]:
     try:
-        data = json.loads(_state_file().read_text())
+        data = json.loads(_state_file().read_text(encoding="utf-8"))
         return {str(k): str(v) for k, v in data.get("statuses", {}).items()}
     except (OSError, ValueError):
         return {}
@@ -58,11 +58,11 @@ def save(report: SelfTestReport) -> None:
         "updated": report.started,
         "statuses": {r.canary_id: r.status for r in report.results},
     }
-    _state_file().write_text(json.dumps(payload, indent=2))
-    with (state_dir() / "history.jsonl").open("a") as fh:
+    _state_file().write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    with (state_dir() / "history.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(report.to_dict()) + "\n")
 
 
 def append_jsonl(name: str, record: dict[str, Any]) -> None:
-    with (state_dir() / name).open("a") as fh:
+    with (state_dir() / name).open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(record) + "\n")

@@ -40,7 +40,7 @@ def load_rules(rules_dir: Path | None = None) -> tuple[list[Rule], list[str]]:
     errors: list[str] = []
     for path in sorted([*root.rglob("*.yml"), *root.rglob("*.yaml")]):
         try:
-            rules.append(Rule.from_yaml(path.read_text(), str(path)))
+            rules.append(Rule.from_yaml(path.read_text(encoding="utf-8"), str(path)))
         except (UnsupportedRule, ValueError, OSError) as exc:
             errors.append(f"{path.name}: {exc}")
     return rules, errors

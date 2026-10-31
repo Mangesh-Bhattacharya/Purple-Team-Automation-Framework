@@ -51,7 +51,7 @@ def _read_jsonl(name: str, limit: int) -> list[dict[str, Any]]:
     path = state.state_dir() / name
     rows: list[dict[str, Any]] = []
     try:
-        with path.open() as fh:
+        with path.open(encoding="utf-8") as fh:
             for line in fh:
                 try:
                     rows.append(json.loads(line))

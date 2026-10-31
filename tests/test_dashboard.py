@@ -32,7 +32,7 @@ def test_empty_state_builds_without_results():
 
 def test_corrupt_jsonl_lines_are_skipped():
     (state.state_dir() / "alerts.jsonl").write_text(
-        '{"type": "detection", "rule": "r"}\n{truncated\n'
+        '{"type": "detection", "rule": "r"}\n{truncated\n', encoding="utf-8"
     )
     assert len(dash.build_summary()["alerts"]) == 1
 
@@ -46,11 +46,11 @@ def test_embedded_data_cannot_break_out_of_script_tag():
 
 
 def test_template_never_uses_innerhtml_for_data():
-    assert "innerHTML" not in dash.TEMPLATE.read_text()
+    assert "innerHTML" not in dash.TEMPLATE.read_text(encoding="utf-8")
 
 
 def test_template_makes_no_external_requests():
-    text = dash.TEMPLATE.read_text()
+    text = dash.TEMPLATE.read_text(encoding="utf-8")
     assert "http://" not in text.replace("http://www.w3.org/2000/svg", "")
     assert "https://" not in text
 

@@ -57,7 +57,7 @@ def _run(argv: list[str], timeout: float = 5.0) -> str:
 
 def _read(path: str) -> str:
     try:
-        return Path(path).read_text(errors="ignore").strip()
+        return Path(path).read_text(encoding="utf-8", errors="ignore").strip()
     except OSError:
         return ""
 
