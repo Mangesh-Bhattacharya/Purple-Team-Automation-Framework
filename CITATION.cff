@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use PTAF Sentinel in research or a report, please cite it as below."
+title: "PTAF Sentinel: continuous verification of detection rules"
+type: software
+authors:
+  - family-names: Bhattacharya
+    given-names: Mangesh
+repository-code: "https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework"
+license: MIT
+version: 0.2.0
+keywords:
+  - detection engineering
+  - purple team
+  - sigma
+  - mitre attack
+  - security validation

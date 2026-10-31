@@ -19,6 +19,8 @@ from typing import Any, Callable
 
 import psutil
 
+from . import winmeta
+
 Event = dict[str, Any]
 
 # Seconds during which a new process is re-inspected for an exec() that changed its identity.
@@ -65,6 +67,10 @@ def _event_from_process(proc: psutil.Process) -> Event | None:
                 "ParentCommandLine": parent_cmd,
                 "CurrentDirectory": cwd,
                 "User": user,
+                # Windows only (empty elsewhere): OriginalFileName, Description, Product, Company,
+                # FileVersion from the executable's version resource. Unlocks ~half of all public
+                # Sigma process-creation rules and defeats rename-the-binary evasion.
+                **winmeta.version_info(image),
             }
     except (psutil.NoSuchProcess, psutil.ZombieProcess, psutil.AccessDenied):
         return None
