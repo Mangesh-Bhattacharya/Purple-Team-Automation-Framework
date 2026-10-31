@@ -319,9 +319,12 @@ function ago(iso, future) {
 }
 function dur(sec) { if (sec == null) return "n/a"; const m = Math.floor(sec / 60); return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + (m % 60) + " min"; }
 // ---- motion, change detection, small helpers ----
-let MOTION = true;
-try { if (localStorage.getItem("ptaf-motion") === "off") MOTION = false; } catch (e) {}
-if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) MOTION = false;
+// Default follows the OS (prefers-reduced-motion). An explicit choice made with the Motion button is
+// remembered and wins over the OS default in either direction.
+let MOTION = true, motionPref = null;
+try { motionPref = localStorage.getItem("ptaf-motion"); } catch (e) {}
+if (motionPref === "off") MOTION = false;
+else if (motionPref !== "on" && window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) MOTION = false;
 function applyMotion() {
   document.documentElement.classList.toggle("motion", MOTION);
   const b = $("btn-motion"); if (b) { b.textContent = "Motion: " + (MOTION ? "on" : "off"); b.setAttribute("aria-pressed", String(MOTION)); }

@@ -40,6 +40,8 @@ HARNESS = r"""
   const out = {}, $ = (id) => document.getElementById(id), q = (s) => Array.from(document.querySelectorAll(s));
   const step = (ms, fn) => new Promise((r) => setTimeout(() => { try { fn(); } catch (e) { out["error_" + Math.random()] = String(e); } r(); }, ms));
   (async function () {
+    // CI runners often report a reduced-motion OS setting; the user's explicit choice must win.
+    await step(100, () => { out.os_default_motion = document.documentElement.classList.contains("motion"); if (!out.os_default_motion) $("btn-motion").click(); });
     await step(300, () => { out.tabs = q("#agent-tabs .tab").map((t) => t.textContent); });
     for (const name of ["Triage", "Explain", "Fix", "Planner", "Readiness"]) {
       await step(120, () => { const b = q("#agent-tabs .tab").find((t) => t.textContent.indexOf(name) === 0); b.click(); });
@@ -144,3 +146,10 @@ def test_hostile_text_in_the_lab_is_inert(observed):
 def test_the_motion_switch_turns_animation_off_and_never_hides_content(observed):
     assert observed["motion_before"] is True and observed["motion_after"] is False
     assert observed["motion_label"] == "Motion: off" and observed["reveal_visible"] is True
+
+
+def test_an_explicit_motion_choice_is_remembered_and_beats_the_os_default():
+    """Source-level guard for the rule the browser run cannot simulate (OS reduced-motion)."""
+    page = dash.TEMPLATE.read_text(encoding="utf-8")
+    assert 'motionPref === "off"' in page
+    assert 'motionPref !== "on"' in page  # reduced-motion only applies when the user has not chosen
