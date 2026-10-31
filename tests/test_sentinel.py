@@ -273,3 +273,31 @@ def test_collector_reports_a_process_whose_identity_changes_after_exec():
         col.stop()
     assert any("os.execv" in c for c in cmds), cmds  # pre-exec identity
     assert any(c.startswith("sleep 2") for c in cmds), cmds  # post-exec identity
+
+
+def test_missed_canary_is_retried_and_flakiness_is_reported(monkeypatch):
+    from ptaf import validation
+
+    calls = []
+
+    def fake_once(canary, rules, host, buffer, **kw):
+        calls.append(1)
+        status = "missed" if len(calls) == 1 else "detected"
+        return CanaryResult(canary.id, canary.technique_id, canary.name, status, detail="first")
+
+    monkeypatch.setattr(validation, "_run_canary_once", fake_once)
+    res = validation.run_canary(CANARIES[0], [], collect_host_info(), EventBuffer())
+    assert len(calls) == 2 and res.status == "detected"
+    assert "retry" in res.detail  # flakiness stays visible
+
+
+def test_a_real_gap_stays_missed_after_retry(monkeypatch):
+    from ptaf import validation
+
+    monkeypatch.setattr(
+        validation,
+        "_run_canary_once",
+        lambda c, r, h, b, **kw: CanaryResult(c.id, c.technique_id, c.name, "missed"),
+    )
+    res = validation.run_canary(CANARIES[0], [], collect_host_info(), EventBuffer())
+    assert res.status == "missed"

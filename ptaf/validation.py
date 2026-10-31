@@ -136,7 +136,7 @@ class SelfTestReport:
         }
 
 
-def run_canary(
+def _run_canary_once(
     canary: Canary,
     rules: list[Rule],
     host: HostInfo,
@@ -189,8 +189,42 @@ def run_canary(
     base.rules_fired = fired
     if base.status != "detected":
         base.status = "missed"
-        base.detail += "no rule mapped to this technique fired on the canary's telemetry"
+        seen = "; ".join(
+            f"{Path(ev['Image'] or '?').name}: {ev['CommandLine'][:70]}" for ev in events[:8]
+        )
+        base.detail += (
+            "no rule mapped to this technique fired on the canary's telemetry. "
+            f"Observed {len(events)} process(es): {seen}"
+        )
     return base
+
+
+def run_canary(
+    canary: Canary,
+    rules: list[Rule],
+    host: HostInfo,
+    buffer: EventBuffer,
+    retries: int = 1,
+    **kwargs: Any,
+) -> CanaryResult:
+    """Run a canary; re-run a ``missed`` result before believing it.
+
+    A genuine detection gap is deterministic and misses every time. A sensor race (a process
+    snapshotted mid-exec under load) does not. If a retry detects the canary we report
+    ``detected`` but say so in ``detail`` so the flakiness is visible, not hidden.
+    """
+    result = _run_canary_once(canary, rules, host, buffer, **kwargs)
+    for _ in range(retries):
+        if result.status != "missed":
+            break
+        retry = _run_canary_once(canary, rules, host, buffer, **kwargs)
+        if retry.status == "detected":
+            retry.detail = (
+                "detected only on retry; first attempt missed (possible sensor race). "
+                f"First attempt: {result.detail}"
+            )
+        result = retry
+    return result
 
 
 def run_selftest(
