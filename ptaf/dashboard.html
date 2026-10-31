@@ -211,10 +211,13 @@ function h(tag, cls, ...kids) {
 function svg(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
 function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
 function when(iso) { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString(); }
+// "Now" for age calculations. Demo data is frozen at its generation time so a shared demo stays
+// internally consistent forever; real data is always measured against the real clock.
+function NOW() { return (typeof S !== "undefined" && S && S.demo) ? Date.parse(S.generated) : Date.now(); }
 // Returns a complete phrase: "just now", "5 minutes ago"; with future=true: "now", "in 45 minutes".
 function ago(iso, future) {
   const t = Date.parse(iso); if (!isFinite(t)) return "unknown";
-  let sec = (Date.now() - t) / 1000; if (future) sec = -sec;
+  let sec = (NOW() - t) / 1000; if (future) sec = -sec;
   if (sec < 0) return future ? "now" : "just now";
   const r = (n, u) => n + " " + u + (n === 1 ? "" : "s");
   let span;
@@ -393,7 +396,7 @@ function renderFleet() {
   const rows = F.hosts.filter((x) => (!q || (x.name + " " + x.os + " " + x.virtualization).toLowerCase().includes(q)) && (!hf || x.health === hf) && (!og || x.gaps > 0))
     .sort((p, q2) => { const a1 = p[flSort.key], b1 = q2[flSort.key]; return (a1 == null ? -1 : b1 == null ? 1 : a1 < b1 ? -1 : a1 > b1 ? 1 : 0) * flSort.dir; });
   const body = $("fl-body"); clear(body);
-  rows.forEach((x) => body.appendChild(h("tr", null, h("td", "mono", x.name), h("td", null, x.os), h("td", null, x.virtualization === "none" ? "bare metal" : x.virtualization), h("td", null, x.coverage == null ? "n/a" : x.coverage + "%"), h("td", null, h("span", "tag " + (x.gaps ? "s-missed" : "s-detected"), String(x.gaps))), h("td", null, String(x.blind)), h("td", null, h("span", "tag s-" + x.health, x.health)), h("td", "sub", ago(new Date(Date.now() - x.age_s * 1000).toISOString())))));
+  rows.forEach((x) => body.appendChild(h("tr", null, h("td", "mono", x.name), h("td", null, x.os), h("td", null, x.virtualization === "none" ? "bare metal" : x.virtualization), h("td", null, x.coverage == null ? "n/a" : x.coverage + "%"), h("td", null, h("span", "tag " + (x.gaps ? "s-missed" : "s-detected"), String(x.gaps))), h("td", null, String(x.blind)), h("td", null, h("span", "tag s-" + x.health, x.health)), h("td", "sub", ago(new Date(NOW() - x.age_s * 1000).toISOString())))));
   if (!rows.length) body.appendChild(h("tr", null, h("td", "empty", "No machines match.")));
   const mb = $("fl-matrix"); clear(mb);
   F.matrix.slice().sort((p, q2) => (q2.missed - p.missed) || p.technique_id.localeCompare(q2.technique_id)).forEach((c) => mb.appendChild(h("tr", null, h("td", "mono", c.technique_id), h("td", null, String(c.hosts)), h("td", null, String(c.detected)), h("td", null, h("span", "tag " + (c.missed ? "s-missed" : "s-detected"), String(c.missed))), h("td", null, String(c.blind)), h("td", null, h("span", "tag s-" + (c.status === "detected" ? "detected" : c.status === "missed" ? "missed" : "blind"), c.status === "detected" ? "✓ protected" : c.status === "missed" ? "✕ gap" : "! blind")))));
