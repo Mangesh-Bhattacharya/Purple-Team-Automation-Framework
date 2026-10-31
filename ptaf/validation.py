@@ -15,7 +15,9 @@ error          the canary could not be launched
 
 from __future__ import annotations
 
+import os
 import subprocess  # nosec B404 - canary argv comes only from canaries.py
+import sys
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -158,8 +160,9 @@ def _run_canary_once(
     mark = buffer.mark()
     try:
         proc = subprocess.Popen(  # nosec B603 - fixed benign argv, no shell=True
-            argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL
-        )
+            argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL,
+            env=child_env(),
+        )  # fmt: skip
     except OSError as exc:
         base.detail = f"could not launch canary: {exc}"
         return base
@@ -208,6 +211,25 @@ def _run_canary_once(
             f"Observed {len(events)} process(es): {seen}"
         )
     return base
+
+
+def child_env() -> dict[str, str]:
+    """Environment for programs PTAF launches (canaries, probes).
+
+    A PyInstaller app points ``LD_LIBRARY_PATH`` at its own bundled libraries, and every child process
+    inherits it. System tools such as tcpdump or nmap then load incompatible libraries and die at start
+    with exit status 127 (found by the release dry run: the packaged Linux app silently failed every
+    external-tool canary). Give children the library path the app was started with.
+    """
+    env = dict(os.environ)
+    if getattr(sys, "frozen", False):
+        for var in ("LD_LIBRARY_PATH", "LIBPATH", "DYLD_LIBRARY_PATH"):
+            original = env.get(var + "_ORIG")
+            if original is not None:
+                env[var] = original
+            else:
+                env.pop(var, None)  # it was set by the bundle, not by the user
+    return env
 
 
 RACE_RETRIES = 3  # extra attempts for a lost read-after-event race (see run_canary)

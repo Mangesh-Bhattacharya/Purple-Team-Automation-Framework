@@ -505,3 +505,18 @@ def test_a_no_telemetry_result_says_whether_the_tool_ran_and_how_it_exited(monke
     # an empty buffer that never receives events: the sensor "sees nothing"
     res = validation._run_canary_once(quick, [], collect_host_info(), EventBuffer(), settle=0.05)
     assert res.status == "no_telemetry" and "exited with code 7" in res.detail
+
+
+def test_children_of_a_packaged_app_get_the_original_library_path_not_the_bundles(monkeypatch):
+    """PyInstaller points LD_LIBRARY_PATH at its bundle; tools launched from it then exit 127."""
+    from ptaf import validation
+
+    monkeypatch.setenv("LD_LIBRARY_PATH", "/bundle/_MEI123")
+    monkeypatch.setenv("LD_LIBRARY_PATH_ORIG", "/the/users/own")
+    assert validation.child_env()["LD_LIBRARY_PATH"] == "/bundle/_MEI123"  # not frozen: untouched
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert validation.child_env()["LD_LIBRARY_PATH"] == "/the/users/own"  # restored
+    monkeypatch.delenv("LD_LIBRARY_PATH_ORIG")
+    assert "LD_LIBRARY_PATH" not in validation.child_env()  # it was the bundle's own: removed
+    monkeypatch.setenv("PATH", "/usr/bin")
+    assert validation.child_env()["PATH"] == "/usr/bin"  # everything else is passed through
