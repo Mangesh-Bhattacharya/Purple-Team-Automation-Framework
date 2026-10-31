@@ -655,7 +655,8 @@ def stop_on_signals() -> None:
     def _raise(*_: Any) -> None:
         raise KeyboardInterrupt
 
-    for name in ("SIGINT", "SIGTERM"):
+    # SIGBREAK is what Ctrl+Break (and CTRL_BREAK_EVENT to a process group) delivers on Windows.
+    for name in ("SIGINT", "SIGTERM", "SIGBREAK"):
         sig = getattr(signal, name, None)
         if sig is not None:
             try:
