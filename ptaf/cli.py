@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -10,6 +12,7 @@ import click
 from . import state
 from . import dashboard as dash
 from .exports import badge, navigator_layer
+from .fleet import load_fleet
 from .monitor import Monitor
 from .platform_info import collect_host_info
 from .service import render
@@ -161,6 +164,18 @@ def monitor(rules_dir, only, skip, collector, interval: int, once: bool, quiet: 
 def doctor(rules_dir, collector, as_json: bool) -> None:
     """Preflight: can this machine run the agent, and how much can the sensor see?"""
     checks = run_checks(rules_dir, collector or default_mode())
+    try:  # best effort: lets the dashboard show the last health check
+        (state.state_dir() / "doctor.json").write_text(
+            json.dumps(
+                {
+                    "time": datetime.now(timezone.utc).isoformat(),
+                    "checks": [c.to_dict() for c in checks],
+                }
+            ),
+            encoding="utf-8",
+        )
+    except OSError:
+        pass
     if as_json:
         click.echo(json.dumps([c.to_dict() for c in checks], indent=2))
     else:
@@ -268,6 +283,12 @@ def export_navigator(rules_dir: Path | None) -> None:
     click.echo(json.dumps(navigator_layer(report, rules), indent=2))
 
 
+@export.command("summary")
+def export_summary() -> None:
+    """Print this host's dashboard summary as JSON (collect these for the organization view)."""
+    click.echo(json.dumps(dash.build_summary(), indent=2))
+
+
 @main.command()
 @click.option(
     "--os",
@@ -285,7 +306,20 @@ def service(os_name: str | None, interval: int) -> None:
 @main.command()
 @click.option("--host", default="127.0.0.1", show_default=True, help="Bind address.")
 @click.option("--port", default=8787, show_default=True)
-@click.option("--demo", is_flag=True, help="Use clearly-labelled sample data.")
+@click.option("--demo", is_flag=True, help="Use clearly-labelled sample data (includes a fleet).")
+@click.option(
+    "--fleet",
+    "fleet_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    help="Directory of exported host summaries (`ptaf export summary`) for the organization view.",
+)
+@click.option(
+    "--token",
+    default=None,
+    help="Access token (or env PTAF_DASHBOARD_TOKEN). REQUIRED when binding beyond localhost. "
+    "Open the page as http://host:port/#token=VALUE (the fragment is never sent to servers).",
+)
 @click.option(
     "--export",
     "export_path",
@@ -293,13 +327,23 @@ def service(os_name: str | None, interval: int) -> None:
     default=None,
     help="Write a self-contained HTML snapshot (for clients) and exit.",
 )
-def dashboard(host: str, port: int, demo: bool, export_path: Path | None) -> None:
-    """Plain-English dashboard: live on localhost, or an HTML snapshot to share."""
+def dashboard(host, port, demo, fleet_dir, token, export_path) -> None:
+    """Plain-English dashboard: is the tool running, what's covered, what needs doing.
+
+    Live on localhost, token-protected on a LAN, or exported as one HTML file to share.
+    """
+    token = token or os.environ.get("PTAF_DASHBOARD_TOKEN") or None
     if export_path:
         summary = dash.demo_summary() if demo else dash.build_summary()
-        export_path.write_text(dash.render_html(summary), encoding="utf-8")
+        fleet = dash.demo_fleet() if demo else (load_fleet(fleet_dir) if fleet_dir else None)
+        export_path.write_text(dash.render_html(summary, fleet), encoding="utf-8")
         click.echo(f"Wrote {export_path}")
         return
-    if host not in ("127.0.0.1", "localhost", "::1"):
-        click.echo("WARNING: dashboard has no authentication; binding beyond localhost.", err=True)
-    dash.serve(host, port, demo)
+    if host not in ("127.0.0.1", "localhost", "::1") and not token:
+        raise click.UsageError(
+            "refusing to serve beyond localhost without an access token. "
+            "Pass --token (or set PTAF_DASHBOARD_TOKEN)."
+        )
+    if token and len(token) < 12:
+        raise click.UsageError("the access token must be at least 12 characters")
+    dash.serve(host, port, demo, fleet_dir, token)

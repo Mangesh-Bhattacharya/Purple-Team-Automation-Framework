@@ -42,7 +42,7 @@ pytest
   ATT&CK technique(s) it maps to, and keep it safe-by-default (see above).
 - **New defensive module / detection rule:** add it under
   `modules/defensive/`. Sigma rules go in
-  `modules/defensive/detection_rules/`.
+  `ptaf/rules/`.
 - **AI/analysis plugin:** add it under `modules/ai_analysis/`, and document
   what input it expects and what it outputs.
 - **Docs:** improvements to `docs/` and module READMEs are always welcome,

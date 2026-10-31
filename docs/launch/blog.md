@@ -43,7 +43,7 @@ The dashboard (`ptaf dashboard`) leads with a sentence, not a graph: "1 of 4
 tested attacker behaviors went undetected," then what changed, what it means and
 what to do. You can export it as one HTML file to hand to a client.
 
-![Sentinel dashboard, demo data](../assets/dashboard-demo.png)
+![Sentinel dashboard, demo data](../assets/dashboard-demo-v2.jpg)
 
 ## What it does not do (yet)
 

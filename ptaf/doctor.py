@@ -229,17 +229,25 @@ def run_checks(rules_dir: Path | None = None, collector_mode: str = "auto") -> l
 
     available = canaries_for(host.os, sensor=sensor_kind)
     on_os = [c for c in CANARIES if host.os in c.platforms]
-    skipped = [c.id for c in on_os if c not in available]
+    installable = [c for c in on_os if c.precondition()]
+    not_installed = [c.id for c in on_os if c not in installable]
+    needs_sensor = [c.id for c in installable if c not in available]
     if not available:
         checks.append(Check("canaries", FAIL, f"no canaries can run on {host.os}"))
-    elif skipped:
+    elif not_installed or needs_sensor:
+        why = []
+        if needs_sensor:
+            why.append(
+                f"{len(needs_sensor)} need the event-driven sensor ({', '.join(needs_sensor)})"
+            )
+        if not_installed:
+            why.append(f"{len(not_installed)} need tools that are not installed")
         checks.append(
             Check(
                 "canaries",
-                WARN,
-                f"{len(available)} runnable; skipped (missing "
-                f"prerequisite): {', '.join(skipped)}",
-                "Install the missing interpreter if you want those checked.",
+                WARN if needs_sensor else OK,
+                f"{len(available)} runnable; skipped: " + "; ".join(why),
+                "Run as root on Linux for the event-driven sensor." if needs_sensor else "",
             )
         )
     else:

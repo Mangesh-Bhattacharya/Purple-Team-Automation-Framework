@@ -37,7 +37,7 @@ pip install -e . && ptaf selftest
 
 Details, limits and safety model: [docs/sentinel.md](docs/sentinel.md). For organizations: [docs/enterprise.md](docs/enterprise.md). **Kali Linux:** [docs/kali.md](docs/kali.md).
 
-![Dashboard (demo data)](docs/assets/dashboard-demo.png)
+![Dashboard: agent health, what needs attention, coverage, history, alerts, sensor health, fleet (demo data)](docs/assets/dashboard-demo-v2.jpg)
 
 ## Core Capabilities
 
@@ -146,7 +146,7 @@ PTAF/
 │   ├── defensive/           # Detection & defensive automation modules
 │   │   ├── log_parser.py
 │   │   ├── validate_detections.py
-│   │   └── detection_rules/
+│   │   └── (rules moved to ptaf/rules/)
 │   └── ai_analysis/         # AI-driven analysis plugins
 │       ├── clustering.py
 │       └── config.yaml

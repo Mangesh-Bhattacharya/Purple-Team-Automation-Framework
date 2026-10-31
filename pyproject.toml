@@ -18,7 +18,7 @@ ptaf = "ptaf.cli:main"
 packages = ["ptaf"]
 
 [tool.setuptools.package-data]
-ptaf = ["dashboard.html"]
+ptaf = ["dashboard.html", "rules/*.yml"]
 
 [tool.black]
 line-length = 100

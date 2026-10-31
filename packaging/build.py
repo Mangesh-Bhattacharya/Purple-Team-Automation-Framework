@@ -27,8 +27,7 @@ def main() -> int:
         "--name",
         "ptaf",
         "--add-data",
-        f"{ROOT / 'modules' / 'defensive' / 'detection_rules'}{SEP}"
-        "modules/defensive/detection_rules",
+        f"{ROOT / 'ptaf' / 'rules'}{SEP}ptaf/rules",
         "--add-data",
         f"{ROOT / 'ptaf' / 'dashboard.html'}{SEP}ptaf",
         "--paths",

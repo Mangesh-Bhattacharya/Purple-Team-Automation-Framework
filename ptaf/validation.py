@@ -16,7 +16,6 @@ error          the canary could not be launched
 from __future__ import annotations
 
 import subprocess  # nosec B404 - canary argv comes only from canaries.py
-import sys
 import threading
 import time
 from dataclasses import asdict, dataclass, field
@@ -30,14 +29,10 @@ from .sensor import make_collector
 from .platform_info import HostInfo
 from .sigma_lite import Rule, UnsupportedRule
 
-
-def _bundle_root() -> Path:
-    """Repo root when run from source; PyInstaller's extraction dir when frozen."""
-    frozen = getattr(sys, "_MEIPASS", None)
-    return Path(frozen) if frozen else Path(__file__).resolve().parents[1]
-
-
-DEFAULT_RULES_DIR = _bundle_root() / "modules" / "defensive" / "detection_rules"
+# The rules ship INSIDE the package, so every install method (pip, the Kali installer, the
+# frozen executable, a source checkout) finds them. A packaging bug here once shipped agents
+# with zero rules; tests/test_packaging.py now guards it.
+DEFAULT_RULES_DIR = Path(__file__).resolve().parent / "rules"
 
 
 def load_rules(rules_dir: Path | None = None) -> tuple[list[Rule], list[str]]:

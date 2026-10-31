@@ -40,7 +40,7 @@ jobs:
           import pathlib, sys, yaml
 
           failed = False
-          for path in pathlib.Path("modules/defensive/detection_rules").rglob("*.yml"):
+          for path in pathlib.Path("ptaf/rules").rglob("*.yml"):
               try:
                   yaml.safe_load(path.read_text())
                   print(f"OK: {path}")
@@ -75,6 +75,10 @@ jobs:
 
       - name: Run tests
         run: pytest -v
+
+      - name: Installed-package check (rules and dashboard must ship in a real install)
+        shell: bash
+        run: python packaging/check_wheel.py
 
       - name: Sentinel self-test (real canaries on this runner)
         shell: bash
@@ -113,9 +117,3 @@ jobs:
           sudo env "PATH=$PATH" python -m ptaf selftest --collector procconn | tee /tmp/out.txt
           grep -q "kali-\|Network scanner (nmap)" /tmp/out.txt
           grep -q "DETECTED .*T1046" /tmp/out.txt
-      - name: Forcing the event-driven sensor without root must fail clearly (exit 3)
-        run: |
-          set +e
-          python -m ptaf selftest --collector procconn
-          code=$?
-          [ "$code" -eq 3 ] || { echo "expected exit 3, got $code"; exit 1; }

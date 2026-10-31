@@ -1,6 +1,6 @@
 """Automated test harness for detection coverage.
 
-Loads every Sigma-style rule under modules/defensive/detection_rules/,
+Loads every Sigma-style rule under ptaf/rules/,
 checks it is well-formed, and reports which MITRE ATT&CK technique IDs
 (from the rule's "tags") have at least one detection rule -- cross-checked
 against the offensive module's attack_techniques.yaml so it's easy to see
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-RULES_DIR = REPO_ROOT / "modules" / "defensive" / "detection_rules"
+RULES_DIR = REPO_ROOT / "ptaf" / "rules"
 ATTACK_TECHNIQUES_FILE = REPO_ROOT / "modules" / "offensive" / "attack_techniques.yaml"
 
 REQUIRED_FIELDS = ["title", "id", "logsource", "detection", "level"]
@@ -77,7 +77,7 @@ def load_known_technique_ids() -> set[str]:
 
 def main() -> int:
     if not RULES_DIR.exists():
-        print(f"No detection_rules directory at {RULES_DIR}")
+        print(f"No rules directory at {RULES_DIR}")
         return 1
 
     rule_files = sorted(RULES_DIR.rglob("*.yml")) + sorted(RULES_DIR.rglob("*.yaml"))

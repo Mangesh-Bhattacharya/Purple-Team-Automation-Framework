@@ -137,9 +137,11 @@ def _unix_python_inline_b64(_m: str) -> list[str]:
 
 
 def _preload_argv(var: str) -> list[str]:
-    # Prefixing the ':' builtin keeps the variable in the command line without involving the
-    # dynamic loader (some binaries abort on a missing preload library, ending the canary early).
-    return _sh(f"{var}=/nonexistent/ptaf-canary.so :; sleep 1")
+    # `true` is a REGULAR builtin, so the assignment stays local to that one command and never
+    # reaches `sleep` or the dynamic loader (`:` is a POSIX *special* builtin whose assignments
+    # can persist and be exported, which let a missing preload library abort the canary early).
+    # The trailing `:` also stops the shell exec-ing sleep and replacing its own command line.
+    return _sh(f"{var}=/nonexistent/ptaf-canary.so true; sleep 1; :")
 
 
 def _unix_preload_env(_m: str) -> list[str]:
