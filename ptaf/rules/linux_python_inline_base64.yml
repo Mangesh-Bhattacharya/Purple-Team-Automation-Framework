@@ -1,0 +1,28 @@
+title: Python Inline Code Decoding Base64 (linux)
+id: 2be839bf-d1e0-594d-9033-2dc6df3bbcbc
+status: experimental
+description: >
+  Detects python -c one-liners that handle base64, often used to stage or obfuscate code. Maps to T1059.006 and T1027.
+references:
+  - https://attack.mitre.org/techniques/T1059/006/
+  - https://attack.mitre.org/techniques/T1027/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection_image:
+    Image|contains: 'python'
+  selection_code:
+    CommandLine|contains|all:
+      - ' -c '
+      - 'base64'
+  condition: selection_image and selection_code
+falsepositives:
+  - Developer and build tooling uses python -c with base64 for legitimate encoding.
+level: medium
+tags:
+  - attack.execution
+  - attack.t1059.006
+  - attack.t1027

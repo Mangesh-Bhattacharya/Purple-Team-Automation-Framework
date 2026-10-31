@@ -1,0 +1,32 @@
+title: Shell History Disabled (macos)
+id: e15af31c-51cf-54cf-a120-8508b47de7d1
+status: experimental
+description: >
+  Detects a shell command line that disables history logging, a common anti-forensics step. Maps to T1070.003.
+references:
+  - https://attack.mitre.org/techniques/T1070/003/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: macos
+detection:
+  selection_shell:
+    Image|endswith:
+        - '/sh'
+        - '/bash'
+        - '/zsh'
+        - '/dash'
+  selection_history:
+    CommandLine|contains:
+      - 'HISTFILE=/dev/null'
+      - 'unset HISTFILE'
+      - 'HISTSIZE=0'
+      - 'history -c'
+  condition: selection_shell and selection_history
+falsepositives:
+  - Privacy-minded admins and some CI images disable history on purpose.
+level: medium
+tags:
+  - attack.defense_evasion
+  - attack.t1070.003

@@ -20,8 +20,8 @@ real room to shape the architecture, not just add small fixes.
 ## Getting started
 
 ```bash
-git clone https://github.com/Mangesh-Bhattacharya/PTAF.git
-cd PTAF
+git clone https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework.git
+cd Purple-Team-Automation-Framework
 python3 -m venv .venv
 source .venv/bin/activate   # .venv\Scripts\activate on Windows
 pip install -r requirements.txt
@@ -42,7 +42,7 @@ pytest
   ATT&CK technique(s) it maps to, and keep it safe-by-default (see above).
 - **New defensive module / detection rule:** add it under
   `modules/defensive/`. Sigma rules go in
-  `modules/defensive/detection_rules/`.
+  `ptaf/rules/`.
 - **AI/analysis plugin:** add it under `modules/ai_analysis/`, and document
   what input it expects and what it outputs.
 - **Docs:** improvements to `docs/` and module READMEs are always welcome,

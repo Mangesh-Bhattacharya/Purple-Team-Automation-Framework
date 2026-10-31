@@ -1,0 +1,24 @@
+title: Dynamic Linker Preload Variable on Command (macos)
+id: 80b4f001-9b2d-5c90-9499-34430492ac44
+status: experimental
+description: >
+  Detects DYLD_INSERT_LIBRARIES set on a command line, used for library injection and hooking. Maps to T1574.006.
+references:
+  - https://attack.mitre.org/techniques/T1574/006/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: macos
+detection:
+  selection:
+    CommandLine|contains: 'DYLD_INSERT_LIBRARIES='
+  condition: selection
+falsepositives:
+  - Profilers, sanitizers and some debugging tools set this legitimately.
+level: high
+tags:
+  - attack.persistence
+  - attack.privilege_escalation
+  - attack.defense_evasion
+  - attack.t1574.006

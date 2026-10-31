@@ -1,0 +1,28 @@
+title: Packet Capture Tool Executed (linux)
+id: 7ee152af-85dc-5e41-9a66-b2aa5e52a3c8
+status: experimental
+description: >
+  Detects packet-capture and interception tools. Maps to T1040.
+references:
+  - https://attack.mitre.org/techniques/T1040/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: linux
+detection:
+  selection:
+    Image|endswith:
+      - '/tcpdump'
+      - '/tshark'
+      - '/dumpcap'
+      - '/ettercap'
+      - '/bettercap'
+  condition: selection
+falsepositives:
+  - Network troubleshooting by administrators is common; tune for your environment.
+level: low
+tags:
+  - attack.credential_access
+  - attack.discovery
+  - attack.t1040

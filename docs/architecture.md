@@ -26,7 +26,7 @@ flowchart LR
 
     subgraph Defensive[Defensive Automation]
         LP[log_parser.py]
-        DR[detection_rules/*.yml]
+        DR[ptaf/rules/*.yml]
         VD[validate_detections.py]
         LP --> VD
         DR --> VD
@@ -74,7 +74,7 @@ PTAF/
 │   ├── defensive/
 │   │   ├── log_parser.py        # Raw logs -> NormalizedEvent
 │   │   ├── validate_detections.py
-│   │   └── detection_rules/     # Sigma-style YAML rules
+│   │   └── (Sigma rules moved to ptaf/rules/)
 │   └── ai_analysis/
 │       ├── clustering.py
 │       └── config.yaml

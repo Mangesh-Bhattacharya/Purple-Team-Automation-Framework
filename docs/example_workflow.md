@@ -32,7 +32,7 @@ and prints one JSON `Finding` per technique, e.g.:
 python -m modules.defensive.validate_detections
 ```
 
-This loads every rule under `modules/defensive/detection_rules/`,
+This loads every rule under `ptaf/rules/`,
 validates it's well-formed and ATT&CK-tagged, and prints which technique
 IDs (from `modules/offensive/attack_techniques.yaml`) have **no**
 matching detection rule yet -- i.e. the gap a real red/purple team
@@ -41,7 +41,7 @@ exercise is meant to surface.
 Example output:
 
 ```
-[OK] modules/defensive/detection_rules/suspicious_encoded_powershell.yml
+[OK] ptaf/rules/suspicious_encoded_powershell.yml
 
 Techniques with a detection rule: ['T1027', 'T1059.001']
 Techniques with NO detection rule yet: ['T1021', 'T1078', 'T1087', 'T1110', 'T1526', 'T1583']

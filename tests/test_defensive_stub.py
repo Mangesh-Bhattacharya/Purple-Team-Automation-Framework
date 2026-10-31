@@ -46,6 +46,4 @@ def test_example_detection_rule_is_valid():
     for rule_path in rule_files:
         result = check_rule(rule_path)
         assert result.ok, f"{rule_path}: {result.errors}"
-        assert (
-            result.technique_ids
-        ), f"{rule_path} is not mapped to any ATT&CK technique"
+        assert result.technique_ids, f"{rule_path} is not mapped to any ATT&CK technique"

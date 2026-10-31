@@ -1,0 +1,35 @@
+title: PowerShell With Bypass Policy and Hidden Window (windows)
+id: bcb8cb9f-07bc-581f-a17f-fa34648fe547
+status: experimental
+description: >
+  Detects PowerShell launched with an execution-policy bypass and a hidden window. Maps to T1059.001 and T1564.003.
+references:
+  - https://attack.mitre.org/techniques/T1059/001/
+  - https://attack.mitre.org/techniques/T1564/003/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection_image:
+    Image|endswith:
+      - '\powershell.exe'
+      - '\pwsh.exe'
+  selection_bypass:
+    CommandLine|contains:
+      - '-ExecutionPolicy Bypass'
+      - '-ep bypass'
+  selection_hidden:
+    CommandLine|contains:
+      - '-WindowStyle Hidden'
+      - '-w hidden'
+  condition: selection_image and selection_bypass and selection_hidden
+falsepositives:
+  - Some deployment tools launch hidden, policy-bypassed PowerShell.
+level: high
+tags:
+  - attack.execution
+  - attack.defense_evasion
+  - attack.t1059.001
+  - attack.t1564.003

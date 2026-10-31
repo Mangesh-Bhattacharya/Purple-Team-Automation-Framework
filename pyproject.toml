@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ptaf"
+version = "0.2.0"
+description = "PTAF Sentinel: continuously prove your detections still fire (Windows, macOS, Linux, VMs)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["pyyaml", "click", "psutil"]
+
+[project.scripts]
+ptaf = "ptaf.cli:main"
+
+[tool.setuptools]
+packages = ["ptaf"]
+
+[tool.setuptools.package-data]
+ptaf = ["dashboard.html", "rules/*.yml"]
+
+[tool.black]
+line-length = 100

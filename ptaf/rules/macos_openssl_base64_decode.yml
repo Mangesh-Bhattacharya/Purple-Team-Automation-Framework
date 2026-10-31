@@ -1,0 +1,25 @@
+title: OpenSSL Base64 Decode (macos)
+id: 2f49284d-8f8a-5d23-a7d2-06f188932560
+status: experimental
+description: >
+  Detects openssl used to decode base64, a common way to unpack staged payloads. Maps to T1140.
+references:
+  - https://attack.mitre.org/techniques/T1140/
+author: PTAF (example rule, adapt before production use)
+date: 2026/10/31
+logsource:
+  category: process_creation
+  product: macos
+detection:
+  selection:
+    Image|endswith: '/openssl'
+    CommandLine|contains|all:
+      - ' enc'
+      - ' -d'
+  condition: selection
+falsepositives:
+  - Certificate and key tooling decodes base64 routinely; scope by parent or user.
+level: low
+tags:
+  - attack.defense_evasion
+  - attack.t1140

@@ -4,6 +4,7 @@
 # Core
 pyyaml
 click
+psutil
 rich
 
 # Reporting

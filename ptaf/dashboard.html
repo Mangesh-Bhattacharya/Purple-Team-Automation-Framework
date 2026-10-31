@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>PTAF Sentinel — Detection Assurance</title>
+<style>
+:root{--radius:.625rem;--background:oklch(16.47% .0203 57.05);--foreground:oklch(95.07% .0155 67.64);
+--card:oklch(22.84% .0251 63.32);--primary:oklch(78% .16 65);--primary-hover:oklch(82.76% .1293 66.47);
+--muted:oklch(24.2% .0317 59.19);--muted-foreground:oklch(85.67% .0176 67.59);--accent:oklch(29.34% .043 53.4);
+--destructive:oklch(69.8% .1698 35.2);--success:oklch(69.9% .14 150.04);--info:oklch(75% .1306 240.1);
+--border:oklch(29.34% .043 53.4);--border-emph:oklch(36.65% .0544 49.77);--term:oklch(14% .0052 86.6)}
+*{box-sizing:border-box}
+html{color-scheme:dark;scroll-behavior:smooth}
+body{margin:0;background:var(--background);color:var(--foreground);
+font-family:"IBM Plex Sans",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.55}
+.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+a{color:var(--primary)}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:4px}
+.grid-bg{position:absolute;inset:0 0 auto 0;height:900px;pointer-events:none;
+background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px);
+background-size:56px 56px;-webkit-mask-image:radial-gradient(at 50% 0,#000 30%,#0000 75%);mask-image:radial-gradient(at 50% 0,#000 30%,#0000 75%);opacity:.5}
+.wrap{position:relative;max-width:1140px;margin:0 auto;padding:0 20px 64px}
+header{position:sticky;top:0;z-index:5;backdrop-filter:blur(14px);background:oklch(16.47% .0203 57.05/.78);border-bottom:1px solid var(--border)}
+header .in{max-width:1140px;margin:0 auto;padding:10px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-size:14px;font-weight:600}.caret{color:var(--primary);animation:blink 1s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.caret{animation:none}html{scroll-behavior:auto}}
+nav{display:flex;gap:2px;flex-wrap:wrap}
+nav a{color:var(--muted-foreground);text-decoration:none;font-size:13px;padding:4px 9px;border-radius:6px}
+nav a:hover{background:var(--accent);color:var(--foreground)}
+.pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border-emph);background:var(--muted);border-radius:999px;padding:3px 12px;font-size:13px;font-weight:500}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted-foreground)}
+.pill.online .dot{background:var(--success)}.pill.stale .dot{background:var(--primary)}
+.pill.offline .dot,.pill.never .dot{background:var(--destructive)}
+.chip{border:1px solid var(--border-emph);background:var(--muted);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--muted-foreground)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.banner-top{text-align:center;font-weight:600;font-size:13px;padding:6px}
+.demo{background:var(--primary);color:var(--background)}
+.lost{background:var(--destructive);color:var(--background)}
+.hero{position:relative;display:grid;grid-template-columns:auto 1fr;gap:32px;align-items:center;padding:40px 0 20px}
+.ring{width:168px;height:168px;position:relative}
+.ring svg{transform:rotate(-90deg)}
+.ring .num{position:absolute;inset:0;display:grid;place-items:center;text-align:center}
+.ring .num b{font-size:38px;line-height:1}.ring .num small{display:block;color:var(--muted-foreground);font-size:12px;margin-top:4px}
+h1{font-size:clamp(23px,3.6vw,34px);line-height:1.15;margin:0 0 10px;letter-spacing:-.01em}
+.lede{color:var(--muted-foreground);margin:0;max-width:62ch}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--primary);margin:38px 0 6px;font-weight:600}
+.sub{color:var(--muted-foreground);font-size:13px}
+.h2sub{margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px}
+.card:hover{border-color:var(--border-emph)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:6px}
+.kpi .l{font-size:12px;color:var(--muted-foreground);text-transform:uppercase;letter-spacing:.06em}
+.kpi .v{font-size:24px;font-weight:600;margin:2px 0}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.item{display:grid;grid-template-columns:auto 1fr;gap:12px;padding:12px 14px;border:1px solid var(--border);border-left-width:4px;border-radius:var(--radius);background:var(--card);margin-bottom:8px}
+.item.critical{border-left-color:var(--destructive)}.item.warning{border-left-color:var(--primary)}
+.item.info{border-left-color:var(--info)}.item.ok{border-left-color:var(--success)}
+.item .ic{font-weight:700;width:22px;text-align:center}
+.item.critical .ic{color:var(--destructive)}.item.warning .ic{color:var(--primary)}.item.info .ic{color:var(--info)}.item.ok .ic{color:var(--success)}
+.item .t{font-weight:600}.item .a{margin-top:4px;font-size:13px}.item .a b{color:var(--primary)}
+.matrix{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.cell{font:inherit;color:inherit;text-align:left;cursor:pointer;border:1px solid var(--border-emph);border-radius:8px;padding:8px 10px;background:var(--card)}
+.cell .id{font-size:13px;font-weight:600}.cell .st{font-size:11px;margin-top:2px}
+.cell.verified{border-color:var(--success);background:oklch(69.9% .14 150/.14)}
+.cell.gap{border-color:var(--destructive);background:oklch(69.8% .17 35/.16)}
+.cell.blind{border-color:var(--primary);background:oklch(78% .16 65/.12)}
+.cell.unverified{border-style:dashed}
+.cell[aria-pressed="true"]{outline:2px solid var(--foreground)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted-foreground);margin:8px 0}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px;border:1px solid var(--border-emph)}
+.detail{min-height:44px;margin-top:8px;font-size:14px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;color:var(--muted-foreground);font-weight:500;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+th button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+td{padding:10px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:0}
+.tag{display:inline-block;border-radius:6px;padding:1px 8px;font-size:12px;font-weight:600;white-space:nowrap}
+.s-detected,.s-verified,.s-online{background:oklch(69.9% .14 150/.18);color:var(--success)}
+.s-missed,.s-gap,.s-offline,.s-critical{background:oklch(69.8% .17 35/.2);color:var(--destructive)}
+.s-no_telemetry,.s-error,.s-blind,.s-stale,.s-never,.s-warning{background:oklch(78% .16 65/.18);color:var(--primary)}
+.s-unverified,.s-info{background:var(--muted);color:var(--muted-foreground)}
+.strips .row{display:grid;grid-template-columns:minmax(150px,230px) 1fr;gap:12px;align-items:center;padding:5px 0}
+.strips .cells{display:flex;gap:3px;flex-wrap:nowrap;overflow:hidden}
+.strips .c{width:12px;height:22px;border-radius:3px;background:var(--accent);flex:none}
+.c.detected{background:var(--success)}.c.missed{background:var(--destructive)}
+.c.no_telemetry,.c.error{background:var(--primary)}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center}
+input[type=search],select{font:inherit;background:var(--muted);color:var(--foreground);border:1px solid var(--border-emph);border-radius:8px;padding:6px 10px}
+button.btn{font:inherit;background:var(--primary);color:var(--background);border:0;border-radius:8px;padding:7px 14px;font-weight:600;cursor:pointer}
+button.btn:hover{background:var(--primary-hover)}button.btn[disabled]{opacity:.55;cursor:wait}
+button.ghost{font:inherit;background:transparent;color:var(--foreground);border:1px solid var(--border-emph);border-radius:8px;padding:6px 12px;cursor:pointer}
+.feed{background:var(--term);border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;max-height:340px;overflow:auto;font-size:12.5px}
+.feed div{padding:5px 0;border-bottom:1px dashed var(--border);word-break:break-all}.feed div:last-child{border:0}
+.empty{color:var(--muted-foreground);font-size:14px}
+dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:14px}dt{color:var(--muted-foreground)}dd{margin:0}
+.checks div{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:14px}
+.checks div:last-child{border:0}
+.spark{width:100%;height:110px}
+footer{margin-top:44px;color:var(--muted-foreground);font-size:12.5px;border-top:1px solid var(--border);padding-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+[hidden]{display:none!important}
+@media(max-width:700px){.hero{grid-template-columns:1fr;justify-items:start}.strips .row{grid-template-columns:1fr}}
+@media print{
+  :root{--background:#fff;--foreground:#111;--card:#fff;--muted:#f3f3f3;--muted-foreground:#444;--border:#bbb;--border-emph:#999;--term:#fff;--primary:#9a5b00;--accent:#e6e6e6;--success:#1d6b3d;--destructive:#b3261e}
+  body{background:#fff}.grid-bg,header nav,.toolbar,button,.noprint{display:none!important}
+  header{position:static;background:#fff}.card,.item,.cell{break-inside:avoid}.feed{max-height:none}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg" aria-hidden="true"></div>
+<header><div class="in">
+  <div class="brand mono">PTAF Sentinel<span class="caret">_</span></div>
+  <nav aria-label="Sections">
+    <a href="#overview">Overview</a><a href="#attention">Needs attention</a><a href="#coverage">Coverage</a>
+    <a href="#history">History</a><a href="#alerts">Alerts</a><a href="#sensor">Sensor</a>
+    <a href="#fleet" id="nav-fleet" hidden>Fleet</a>
+  </nav>
+  <div class="pill never" id="pill" role="status" aria-live="polite"><span class="dot"></span><span id="pill-text">Loading…</span></div>
+</div></header>
+<div id="demo" class="banner-top demo" hidden>DEMO DATA — fictional sample values, not a real machine or organization</div>
+<div id="lost" class="banner-top lost" role="alert" hidden></div>
+
+<main class="wrap">
+  <section id="overview" class="hero" aria-labelledby="verdict">
+    <div class="ring" id="ring"></div>
+    <div><h1 id="verdict">Loading…</h1><p class="lede" id="lede"></p><div class="chips" id="chips"></div></div>
+  </section>
+  <div class="kpis" id="kpis"></div>
+
+  <h2 id="attention">Needs your attention</h2>
+  <p class="sub h2sub">Most urgent first. Each item says what it means and what to do.</p>
+  <div id="attn"></div>
+
+  <h2 id="coverage">Coverage: which attacker behaviors are we sure we'd see?</h2>
+  <p class="sub h2sub">Each tile is an attacker technique (MITRE ATT&amp;CK). Select one for details.</p>
+  <div class="legend" aria-hidden="true">
+    <span><i style="background:oklch(69.9% .14 150/.4)"></i>✓ Verified: a safe test was caught</span>
+    <span><i style="background:oklch(69.8% .17 35/.4)"></i>✕ Gap: a safe test went unseen</span>
+    <span><i style="background:oklch(78% .16 65/.35)"></i>! Blind: could not be tested</span>
+    <span><i style="border-style:dashed"></i>? Unverified: a rule exists, never tested</span>
+  </div>
+  <div class="matrix" id="matrix" role="group" aria-label="Technique coverage"></div>
+  <div class="detail card" id="mdetail" aria-live="polite">Select a technique above.</div>
+  <div id="what" class="card" style="margin-top:12px"></div>
+
+  <h2 id="history">Check history</h2>
+  <p class="sub h2sub">One row per safe test, one square per past run (oldest left, newest right). A green row that turns red is a regression.</p>
+  <div class="card strips" id="strips"></div>
+  <div class="cols" style="margin-top:12px">
+    <div><h2 style="margin-top:20px">Protection over time</h2><div class="card" id="trend"></div></div>
+    <div><h2 style="margin-top:20px">This machine</h2><div class="card"><dl id="host"></dl></div></div>
+  </div>
+
+  <h2 id="alerts">Alerts</h2>
+  <p class="sub h2sub">Activity that matched a detection rule. Sentinel's own safe tests are labelled <b>test</b> and never counted as real.</p>
+  <div class="toolbar">
+    <label class="sub">Show <select id="f-kind" aria-label="Alert kind"><option value="all">all</option><option value="real" selected>real only</option><option value="test">tests only</option></select></label>
+    <label class="sub">Level <select id="f-level" aria-label="Alert level"><option value="">any</option><option>low</option><option>medium</option><option>high</option><option>critical</option></select></label>
+    <input type="search" id="f-q" placeholder="Search rule or command…" aria-label="Search alerts" size="28">
+    <span class="sub" id="f-count"></span>
+  </div>
+  <div class="feed mono" id="feed" tabindex="0" aria-label="Alert list"></div>
+
+  <h2 id="sensor">Sensor and system health</h2>
+  <p class="sub h2sub">The sensor is what lets the tool see activity. If it is blind, everything above can look green while being wrong.</p>
+  <div class="cols">
+    <div class="card"><dl id="sensor-dl"></dl></div>
+    <div class="card">
+      <div class="toolbar noprint"><button class="btn" id="btn-doctor">Run health check</button><span class="sub" id="doctor-when"></span></div>
+      <div class="checks" id="checks"><span class="empty">No health check yet.</span></div>
+    </div>
+  </div>
+
+  <section id="fleet" hidden>
+    <h2>Organization view</h2>
+    <p class="sub h2sub" id="fleet-sub"></p>
+    <div class="kpis" id="fleet-kpis"></div>
+    <div class="toolbar" style="margin-top:12px">
+      <input type="search" id="fl-q" placeholder="Filter hosts…" aria-label="Filter hosts" size="24">
+      <label class="sub">Health <select id="fl-h" aria-label="Filter by health"><option value="">all</option><option>online</option><option>stale</option><option>offline</option></select></label>
+      <label class="sub"><input type="checkbox" id="fl-gaps"> only hosts with gaps</label>
+    </div>
+    <div class="card" style="padding:6px 8px;overflow-x:auto"><table>
+      <thead><tr id="fl-head"></tr></thead><tbody id="fl-body"></tbody></table></div>
+    <h2 style="margin-top:22px">Where the gaps are, across all machines</h2>
+    <div class="card" style="padding:6px 8px;overflow-x:auto"><table>
+      <thead><tr><th>Technique</th><th>Machines tested</th><th>Protected</th><th>Gap</th><th>Blind</th><th>Worst result</th></tr></thead>
+      <tbody id="fl-matrix"></tbody></table></div>
+  </section>
+
+  <footer>
+    <span class="mono" id="foot"></span>
+    <span class="noprint"><button class="ghost" id="btn-print">Print / save as PDF</button> <button class="ghost" id="btn-json">Download data (JSON)</button></span>
+  </footer>
+</main>
+
+<script id="boot" type="application/json">__PTAF_DATA__</script>
+<script>
+"use strict";
+const NS = "http://www.w3.org/2000/svg";
+const $ = (id) => document.getElementById(id);
+// DOM builder: strings become text nodes, never HTML. Everything from outside goes through here.
+function h(tag, cls, ...kids) {
+  const e = document.createElement(tag); if (cls) e.className = cls;
+  for (const k of kids) { if (k == null) continue; e.appendChild(typeof k === "object" ? k : document.createTextNode(String(k))); }
+  return e;
+}
+function svg(tag, attrs) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+function when(iso) { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString(); }
+function ago(iso, future) {
+  const t = Date.parse(iso); if (!isFinite(t)) return "unknown";
+  let s = (Date.now() - t) / 1000; if (future) s = -s;
+  if (s < 0) return future ? "any moment" : "just now";
+  const r = (n, u) => n + " " + u + (n === 1 ? "" : "s");
+  if (s < 90) return future ? "under a minute" : "just now";
+  if (s < 5400) return r(Math.round(s / 60), "minute");
+  if (s < 129600) return r(Math.round(s / 3600), "hour");
+  return r(Math.round(s / 86400), "day");
+}
+function dur(sec) { if (sec == null) return "n/a"; const m = Math.floor(sec / 60); return m < 60 ? m + " min" : Math.floor(m / 60) + " h " + (m % 60) + " min"; }
+
+let DATA = JSON.parse($("boot").textContent);
+let S = DATA.summary || null, F = DATA.fleet || null;
+const TOKEN = new URLSearchParams(location.hash.slice(1)).get("token");
+const LIVE = location.protocol.startsWith("http");
+let lastOk = Date.now(), flSort = { key: "name", dir: 1 }, selected = null;
+
+function api(path) {
+  const opt = { cache: "no-store", headers: TOKEN ? { Authorization: "Bearer " + TOKEN } : {} };
+  return fetch(path, opt).then((r) => { if (r.status === 401) throw new Error("auth"); if (!r.ok) throw new Error("http " + r.status); return r.json(); });
+}
+
+const STATE_LABEL = { verified: ["✓", "Verified"], gap: ["✕", "Gap"], blind: ["!", "Blind"], unverified: ["?", "Unverified"] };
+const ICON = { critical: "✕", warning: "!", info: "i", ok: "✓" };
+const HEALTH_LABEL = { online: "Agent online", stale: "Agent heartbeat late", offline: "Agent offline", never: "No agent reporting" };
+
+function render() {
+  if (!S) return;
+  $("demo").hidden = !S.demo;
+  const a = S.agent || {}, health = a.health || "never";
+  const pill = $("pill"); pill.className = "pill " + health;
+  $("pill-text").textContent = HEALTH_LABEL[health] + (a.age_s != null && health !== "never" ? " · heartbeat " + (a.age_s < 90 ? Math.round(a.age_s) + " s" : dur(a.age_s)) + " ago" : "");
+
+  const latest = S.latest, results = latest ? latest.results : [];
+  const tested = results.filter((r) => r.status === "detected" || r.status === "missed");
+  const gaps = results.filter((r) => r.status === "missed");
+  const blind = results.filter((r) => r.status === "no_telemetry" || r.status === "error");
+  const cov = latest ? latest.coverage_percent : null;
+
+  const ring = $("ring"); clear(ring);
+  const R = 72, C = 2 * Math.PI * R, pct = cov == null ? 0 : cov;
+  const color = cov == null ? "var(--border-emph)" : cov >= 90 ? "var(--success)" : cov >= 60 ? "var(--primary)" : "var(--destructive)";
+  const sv = svg("svg", { width: 168, height: 168, viewBox: "0 0 168 168", role: "img", "aria-label": "Verified detection coverage " + (cov == null ? "not available" : cov + " percent") });
+  sv.appendChild(svg("circle", { cx: 84, cy: 84, r: R, fill: "none", stroke: "var(--accent)", "stroke-width": 12 }));
+  sv.appendChild(svg("circle", { cx: 84, cy: 84, r: R, fill: "none", stroke: color, "stroke-width": 12, "stroke-linecap": "round", "stroke-dasharray": (C * pct / 100) + " " + C }));
+  ring.appendChild(sv);
+  ring.appendChild(h("div", "num", h("div", null, h("b", "mono", cov == null ? "n/a" : cov + "%"), h("small", null, "verified coverage"))));
+
+  let v, l;
+  if (!latest) { v = "No results yet"; l = "Run “ptaf selftest” (or start “ptaf monitor”) and this page will fill in."; }
+  else if (health === "offline" || health === "never") { v = "The agent is not running."; l = "The numbers below are from the last check (" + ago(latest.started) + " ago). Nothing is being verified right now."; }
+  else if (gaps.length) { v = gaps.length + " of " + tested.length + " tested attacker behaviors went undetected."; l = "These are real holes: we safely imitated the behavior and nothing alerted. Details and fixes are below."; }
+  else if (blind.length) { v = "No gaps found, but " + blind.length + " check" + (blind.length > 1 ? "s" : "") + " could not be verified."; l = "Everything we could test was caught. The rest needs a working sensor on this machine."; }
+  else { v = "All " + tested.length + " tested attacker behaviors were detected."; l = "Your detections fired on every safe test, and the agent keeps re-checking so a silent failure cannot hide."; }
+  $("verdict").textContent = v; $("lede").textContent = l;
+
+  const hd = S.host || {}, chips = $("chips"); clear(chips);
+  [hd.hostname, hd.kali ? "Kali " + (hd.distro_version || "") : hd.distro || hd.os, hd.arch, hd.virtualization && hd.virtualization !== "none" ? "VM: " + hd.virtualization : "bare metal", hd.container ? "in " + hd.container : null]
+    .filter(Boolean).forEach((t) => chips.appendChild(h("span", "chip mono", t)));
+
+  // KPIs
+  const k = $("kpis"); clear(k);
+  const col = a.collector || {}, hc = (S.health_checks || {}).checks || [];
+  const vis = hc.find((c) => c.name === "process visibility");
+  const kpi = (l, val, sub) => k.appendChild(h("div", "card kpi", h("div", "l", l), h("div", "v", val), h("div", "sub", sub)));
+  kpi("Verified coverage", cov == null ? "n/a" : cov + "%", tested.length + " tested · " + results.length + " checks");
+  kpi("Agent", { online: "Online", stale: "Late", offline: "Offline", never: "Not running" }[health], a.uptime_s != null ? "up " + dur(a.uptime_s) + (a.version ? " · v" + a.version : "") : "no heartbeat");
+  kpi("Last check", latest ? ago(latest.started) + " ago" : "never", a.next_selftest && health !== "offline" ? "next in " + ago(a.next_selftest, true) : "—");
+  kpi("Real alerts, 24 h", String((S.alert_counts || {}).real_24h || 0), ((S.alert_counts || {}).synthetic_24h || 0) + " from safe tests");
+  kpi("Sensor", col.name || (latest && latest.sensor ? latest.sensor.name : "n/a"), vis ? vis.detail : (col.errors ? col.errors + " error(s)" : "no errors"));
+
+  // attention
+  const at = $("attn"); clear(at);
+  (S.attention || []).forEach((i) => {
+    const body = h("div", null, h("div", "t", i.title), i.detail ? h("div", "sub", i.detail) : null, i.action ? h("div", "a", h("b", null, "What to do: "), i.action) : null);
+    at.appendChild(h("div", "item " + i.level, h("div", "ic", ICON[i.level]), body));
+  });
+
+  // matrix
+  const mx = $("matrix"); clear(mx);
+  (S.matrix || []).forEach((c) => {
+    const [ic, lab] = STATE_LABEL[c.state] || ["?", c.state];
+    const b = h("button", "cell " + c.state, h("div", "id mono", c.technique_id), h("div", "st", ic + " " + lab));
+    b.type = "button"; b.setAttribute("aria-pressed", String(selected === c.technique_id));
+    b.setAttribute("aria-label", c.technique_id + ": " + lab);
+    b.addEventListener("click", () => { selected = c.technique_id; render(); });
+    mx.appendChild(b);
+  });
+  if (!(S.matrix || []).length) mx.appendChild(h("span", "empty", "No techniques yet."));
+  const sel = (S.matrix || []).find((c) => c.technique_id === selected), md = $("mdetail"); clear(md);
+  if (sel) { md.appendChild(h("b", "mono", sel.technique_id)); md.appendChild(document.createTextNode(" — " + sel.name + ". ")); md.appendChild(document.createTextNode(sel.detail)); }
+  else md.textContent = "Select a technique above.";
+
+  const wt = $("what"); clear(wt);
+  wt.appendChild(h("b", null, "What we tested on this machine"));
+  const tb = h("table"), thead = h("thead", null, h("tr", null, h("th", null, "Attacker behavior"), h("th", null, "Result"), h("th", null, "What it means"), h("th", null, "What to do")));
+  const tbody = h("tbody");
+  results.forEach((r) => {
+    const ex = (S.explain || {})[r.status] || { label: r.status, meaning: "", action: "" };
+    tbody.appendChild(h("tr", null, h("td", null, h("div", null, r.name), h("div", "sub mono", r.technique_id)), h("td", null, h("span", "tag s-" + r.status, ex.label)), h("td", "sub", ex.meaning), h("td", "sub", ex.action)));
+  });
+  if (!results.length) tbody.appendChild(h("tr", null, h("td", "empty", "Nothing tested yet.")));
+  tb.appendChild(thead); tb.appendChild(tbody); wt.appendChild(tb);
+
+  // history strips
+  const st = $("strips"); clear(st);
+  (S.history || []).forEach((row) => {
+    const cells = h("div", "cells");
+    row.cells.forEach((c) => { const d = h("span", "c " + (c ? c.s : "")); d.title = c ? (EXPLAIN_LABEL(c.s) + " · " + when(c.t)) : "not run"; cells.appendChild(d); });
+    st.appendChild(h("div", "row", h("div", null, h("div", null, row.name), h("div", "sub mono", row.technique_id)), cells));
+  });
+  if (!(S.history || []).length) st.appendChild(h("span", "empty", "History appears after the first checks."));
+
+  // trend
+  const tr = $("trend"); clear(tr);
+  const pts = (S.trend || []).filter((p) => p.coverage != null);
+  if (pts.length < 2) tr.appendChild(h("div", "empty", "A trend appears after two or more checks."));
+  else {
+    const W = 400, H = 100, step = W / (pts.length - 1), y = (c) => H - 8 - (H - 16) * c / 100;
+    const sp = svg("svg", { class: "spark", viewBox: "0 0 " + W + " " + H, preserveAspectRatio: "none", role: "img", "aria-label": "Coverage trend, latest " + pts[pts.length - 1].coverage + " percent" });
+    [0, 50, 100].forEach((g) => sp.appendChild(svg("line", { x1: 0, x2: W, y1: y(g), y2: y(g), stroke: "var(--border)", "stroke-dasharray": "3 4", "vector-effect": "non-scaling-stroke" })));
+    sp.appendChild(svg("path", { d: pts.map((p, i) => (i ? "L" : "M") + (i * step).toFixed(1) + " " + y(p.coverage).toFixed(1)).join(" "), fill: "none", stroke: "var(--primary)", "stroke-width": 2.5, "vector-effect": "non-scaling-stroke", "stroke-linejoin": "round" }));
+    tr.appendChild(sp); tr.appendChild(h("div", "sub", pts.length + " checks · from " + pts[0].coverage + "% to " + pts[pts.length - 1].coverage + "% · scale 0–100%"));
+  }
+
+  // host + sensor
+  const dl = $("host"); clear(dl);
+  [["Name", hd.hostname], ["System", hd.os_version], ["Distribution", hd.distro ? hd.distro + (hd.distro_version ? " " + hd.distro_version : "") : null], ["Architecture", hd.arch], ["Virtualization", hd.virtualization === "none" ? "None (bare metal)" : hd.virtualization], ["Container", hd.container || "No"], ["Rules loaded", latest ? latest.rules_loaded : null], ["Last check", latest ? when(latest.started) : "never"]]
+    .forEach(([a1, b1]) => { if (b1 == null) return; dl.appendChild(h("dt", null, a1)); dl.appendChild(h("dd", null, String(b1))); });
+  const sd = $("sensor-dl"); clear(sd);
+  [["Sensor", col.name ? col.name + (col.kind === "event" ? " (event-driven)" : " (polling)") : "n/a"], ["How it works", col.note], ["Events seen", col.events_seen], ["Errors survived", col.errors], ["Dropped by kernel", col.dropped], ["Agent state", a.state], ["Agent started", a.started ? when(a.started) : null], ["Process ID", a.pid]]
+    .forEach(([a1, b1]) => { if (b1 == null || b1 === "") return; sd.appendChild(h("dt", null, a1)); sd.appendChild(h("dd", null, String(b1))); });
+  renderChecks(S.health_checks);
+  renderAlerts();
+
+  $("foot").textContent = "Generated " + ago(S.generated) + " ago · PTAF Sentinel v" + (S.version || "") + " · read-only · no data leaves this machine";
+  renderFleet();
+}
+function EXPLAIN_LABEL(s) { return ((S.explain || {})[s] || {}).label || (s || "not run"); }
+
+function renderChecks(hc) {
+  const box = $("checks"); clear(box);
+  if (!hc || !hc.checks) { box.appendChild(h("span", "empty", "No health check yet. Press “Run health check”.")); return; }
+  $("doctor-when").textContent = "Last run " + ago(hc.time) + " ago";
+  hc.checks.forEach((c) => box.appendChild(h("div", null, h("span", "tag s-" + (c.status === "ok" ? "detected" : c.status === "warn" ? "warning" : "critical"), c.status === "ok" ? "OK" : c.status.toUpperCase()), h("div", null, h("b", null, c.name), h("div", "sub", c.detail), c.fix && c.status !== "ok" ? h("div", "sub", "Fix: " + c.fix) : null))));
+}
+
+function renderAlerts() {
+  const kind = $("f-kind").value, lvl = $("f-level").value, q = $("f-q").value.trim().toLowerCase();
+  const all = (S.alerts || []).slice().reverse();
+  const rows = all.filter((x) => (kind === "all" || (kind === "test") === !!x.synthetic) && (!lvl || x.level === lvl) && (!q || ((x.rule || "") + " " + (x.command_line || "")).toLowerCase().includes(q)));
+  const feed = $("feed"); clear(feed);
+  rows.slice(0, 100).forEach((x) => feed.appendChild(h("div", null, (x.synthetic ? "[test] " : "") + (x.time || "").slice(11, 19) + "  " + x.rule + " (" + x.level + ")  " + (x.command_line || ""))));
+  if (!rows.length) feed.appendChild(h("div", "empty", kind === "real" ? "No real detections. That is good news if nothing suspicious has run." : "Nothing matches."));
+  $("f-count").textContent = "showing " + Math.min(rows.length, 100) + " of " + rows.length;
+}
+
+function renderFleet() {
+  const sec = $("fleet"); sec.hidden = !F; $("nav-fleet").hidden = !F;
+  if (!F) return;
+  const r = F.rollup;
+  $("fleet-sub").textContent = (F.demo ? "Fictional organization. " : "") + r.hosts + " machine" + (r.hosts === 1 ? "" : "s") + " reporting. Each machine is verified independently; the view merges their exported summaries.";
+  const k = $("fleet-kpis"); clear(k);
+  const kpi = (l, val, sub) => k.appendChild(h("div", "card kpi", h("div", "l", l), h("div", "v", val), h("div", "sub", sub)));
+  kpi("Average coverage", r.avg_coverage == null ? "n/a" : r.avg_coverage + "%", "across machines with results");
+  kpi("Reporting", r.online + " / " + r.hosts, r.stale + " late · " + r.offline + " silent");
+  kpi("Machines with gaps", String(r.with_gaps), "need a rule fixed");
+  kpi("Operating systems", Object.entries(r.by_os).map(([a1, b1]) => b1 + " " + a1).join(" · "), Object.entries(r.by_virtualization).map(([a1, b1]) => b1 + " " + a1).join(" · "));
+  const cols = [["name", "Machine"], ["os", "System"], ["virtualization", "Platform"], ["coverage", "Coverage"], ["gaps", "Gaps"], ["blind", "Blind"], ["health", "Reporting"], ["age_s", "Last report"]];
+  const head = $("fl-head"); clear(head);
+  cols.forEach(([key, lab]) => { const b = h("button", null, lab + (flSort.key === key ? (flSort.dir > 0 ? " ▲" : " ▼") : "")); b.type = "button"; b.addEventListener("click", () => { flSort = { key, dir: flSort.key === key ? -flSort.dir : 1 }; renderFleet(); }); head.appendChild(h("th", null, b)); });
+  const q = $("fl-q").value.trim().toLowerCase(), hf = $("fl-h").value, og = $("fl-gaps").checked;
+  const rows = F.hosts.filter((x) => (!q || (x.name + " " + x.os + " " + x.virtualization).toLowerCase().includes(q)) && (!hf || x.health === hf) && (!og || x.gaps > 0))
+    .sort((p, q2) => { const a1 = p[flSort.key], b1 = q2[flSort.key]; return (a1 == null ? -1 : b1 == null ? 1 : a1 < b1 ? -1 : a1 > b1 ? 1 : 0) * flSort.dir; });
+  const body = $("fl-body"); clear(body);
+  rows.forEach((x) => body.appendChild(h("tr", null, h("td", "mono", x.name), h("td", null, x.os), h("td", null, x.virtualization === "none" ? "bare metal" : x.virtualization), h("td", null, x.coverage == null ? "n/a" : x.coverage + "%"), h("td", null, h("span", "tag " + (x.gaps ? "s-missed" : "s-detected"), String(x.gaps))), h("td", null, String(x.blind)), h("td", null, h("span", "tag s-" + x.health, x.health)), h("td", "sub", ago(new Date(Date.now() - x.age_s * 1000).toISOString()) + " ago"))));
+  if (!rows.length) body.appendChild(h("tr", null, h("td", "empty", "No machines match.")));
+  const mb = $("fl-matrix"); clear(mb);
+  F.matrix.slice().sort((p, q2) => (q2.missed - p.missed) || p.technique_id.localeCompare(q2.technique_id)).forEach((c) => mb.appendChild(h("tr", null, h("td", "mono", c.technique_id), h("td", null, String(c.hosts)), h("td", null, String(c.detected)), h("td", null, h("span", "tag " + (c.missed ? "s-missed" : "s-detected"), String(c.missed))), h("td", null, String(c.blind)), h("td", null, h("span", "tag s-" + (c.status === "detected" ? "detected" : c.status === "missed" ? "missed" : "blind"), c.status === "detected" ? "✓ protected" : c.status === "missed" ? "✕ gap" : "! blind")))));
+}
+
+function lostBanner(msg) { const b = $("lost"); b.hidden = !msg; b.textContent = msg || ""; }
+function refresh() {
+  if (!LIVE) return Promise.resolve();
+  return api("/api/summary").then((s) => { S = s; lastOk = Date.now(); lostBanner(""); return F || DATA.fleet === undefined ? null : null; })
+    .then(() => (F || (DATA.auth === true) ? api("/api/fleet").then((f) => { F = f; }).catch(() => {}) : null))
+    .then(render)
+    .catch((e) => {
+      if (e.message === "auth") { lostBanner("Access token required. Open this page using the link that ends in #token=…"); return; }
+      lostBanner("Cannot reach the dashboard server. The data below is from " + ago(new Date(lastOk).toISOString()) + " ago and may be out of date.");
+    });
+}
+
+$("btn-doctor").addEventListener("click", () => {
+  const b = $("btn-doctor"); b.disabled = true; b.textContent = "Checking…";
+  api("/api/doctor").then((d) => { S.health_checks = d; renderChecks(d); }).catch(() => { $("doctor-when").textContent = "Health check unavailable here."; })
+    .finally(() => { b.disabled = false; b.textContent = "Run health check"; });
+});
+$("btn-print").addEventListener("click", () => window.print());
+$("btn-json").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({ summary: S, fleet: F }, null, 2)], { type: "application/json" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "ptaf-sentinel-" + ((S.host || {}).hostname || "host") + ".json"; a.click(); URL.revokeObjectURL(a.href);
+});
+["f-kind", "f-level"].forEach((id) => $(id).addEventListener("change", renderAlerts));
+$("f-q").addEventListener("input", renderAlerts);
+["fl-q", "fl-h", "fl-gaps"].forEach((id) => $(id).addEventListener(id === "fl-q" ? "input" : "change", renderFleet));
+if (!LIVE) { $("btn-doctor").hidden = true; }
+
+if (DATA.auth) {
+  if (!TOKEN) { lostBanner("Access token required. Open this page using the link that ends in #token=…"); $("verdict").textContent = "Access token required"; }
+  else refresh();
+} else render();
+if (LIVE) setInterval(refresh, 5000);
+</script>
+</body>
+</html>

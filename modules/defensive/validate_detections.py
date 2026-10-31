@@ -1,6 +1,6 @@
 """Automated test harness for detection coverage.
 
-Loads every Sigma-style rule under modules/defensive/detection_rules/,
+Loads every Sigma-style rule under ptaf/rules/,
 checks it is well-formed, and reports which MITRE ATT&CK technique IDs
 (from the rule's "tags") have at least one detection rule -- cross-checked
 against the offensive module's attack_techniques.yaml so it's easy to see
@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-RULES_DIR = REPO_ROOT / "modules" / "defensive" / "detection_rules"
+RULES_DIR = REPO_ROOT / "ptaf" / "rules"
 ATTACK_TECHNIQUES_FILE = REPO_ROOT / "modules" / "offensive" / "attack_techniques.yaml"
 
 REQUIRED_FIELDS = ["title", "id", "logsource", "detection", "level"]
@@ -46,7 +46,7 @@ def _extract_technique_ids(tags: list[str]) -> list[str]:
 def check_rule(path: pathlib.Path) -> RuleCheckResult:
     errors: list[str] = []
     try:
-        data = yaml.safe_load(path.read_text())
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
         return RuleCheckResult(path=path, ok=False, errors=[f"YAML parse error: {exc}"])
 
@@ -71,13 +71,13 @@ def check_rule(path: pathlib.Path) -> RuleCheckResult:
 def load_known_technique_ids() -> set[str]:
     if not ATTACK_TECHNIQUES_FILE.exists():
         return set()
-    data = yaml.safe_load(ATTACK_TECHNIQUES_FILE.read_text()) or {}
+    data = yaml.safe_load(ATTACK_TECHNIQUES_FILE.read_text(encoding="utf-8")) or {}
     return {entry["id"] for entry in data.get("techniques", []) if "id" in entry}
 
 
 def main() -> int:
     if not RULES_DIR.exists():
-        print(f"No detection_rules directory at {RULES_DIR}")
+        print(f"No rules directory at {RULES_DIR}")
         return 1
 
     rule_files = sorted(RULES_DIR.rglob("*.yml")) + sorted(RULES_DIR.rglob("*.yaml"))

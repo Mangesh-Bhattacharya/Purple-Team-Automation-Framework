@@ -1,6 +1,6 @@
 # Purple Team Automation Framework (PTAF)
 
-[![CI](https://github.com/Mangesh-Bhattacharya/PTAF/actions/workflows/ci.yml/badge.svg)](https://github.com/Mangesh-Bhattacharya/PTAF/actions/workflows/ci.yml)
+[![CI](https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/actions/workflows/ci.yml/badge.svg)](https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **AI-Driven Offensive + Defensive Security Automation for Mid-Level Practitioners**
@@ -22,6 +22,22 @@ It is designed to run on Kali Linux, Ubuntu, and cloud shells, enabling practiti
 - Collaborate with contributors from across the security community
 
 The long-term goal is to make PTAF a practical, well-documented Purple Team automation toolkit for defenders, SOC analysts, threat hunters, and aspiring security engineers.
+
+## New: PTAF Sentinel (v0.2): your detections, continuously verified
+
+PTAF now ships an endpoint agent for **Windows, macOS, Linux and any VM**. It
+fires harmless canary behaviors, watches the host's own telemetry, and proves
+your Sigma rules still fire. If a rule silently stops working, it raises a
+`detection_drift` alert. Results export as an ATT&CK Navigator layer
+(green = verified, yellow = untested, red = gap) and a coverage badge.
+
+```bash
+pip install -e . && ptaf selftest
+```
+
+Details, limits and safety model: [docs/sentinel.md](docs/sentinel.md). For organizations: [docs/enterprise.md](docs/enterprise.md). **Kali Linux:** [docs/kali.md](docs/kali.md).
+
+![Dashboard: agent health, what needs attention, coverage, history, alerts, sensor health, fleet (demo data)](docs/assets/dashboard-demo-v2.jpg)
 
 ## Core Capabilities
 
@@ -81,8 +97,8 @@ Contributors are encouraged to:
 ## Installation (Kali Linux / Ubuntu / WSL)
 
 ```bash
-git clone https://github.com/Mangesh-Bhattacharya/PTAF.git
-cd PTAF
+git clone https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework.git
+cd Purple-Team-Automation-Framework
 sudo chmod +x install.sh
 ./install.sh
 ```
@@ -130,7 +146,7 @@ PTAF/
 │   ├── defensive/           # Detection & defensive automation modules
 │   │   ├── log_parser.py
 │   │   ├── validate_detections.py
-│   │   └── detection_rules/
+│   │   └── (rules moved to ptaf/rules/)
 │   └── ai_analysis/         # AI-driven analysis plugins
 │       ├── clustering.py
 │       └── config.yaml
