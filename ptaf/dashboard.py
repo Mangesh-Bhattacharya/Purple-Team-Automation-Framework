@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from . import __version__, state, status
+from .agents import run_agents
 from .doctor import run_checks
 from .fleet import load_fleet
 from .platform_info import collect_host_info
@@ -131,12 +132,39 @@ def build_history_strips(history: list[dict[str, Any]], limit: int = 30) -> list
 
 
 # --- "what needs my attention" --------------------------------------------------------------
+_KIND_RULES = (
+    ("used to be detected", "drift"),
+    ("went undetected", "gap"),
+    ("could not be verified", "blind"),
+    ("overdue", "overdue"),
+    ("agent is not running", "agent"),
+    ("no agent has reported", "agent"),
+    ("heartbeat", "agent"),
+    ("rule files failed", "rules"),
+    ("health check", "health"),
+    ("sensor has been hitting", "sensor"),
+    ("kernel dropped", "sensor"),
+    ("polling sensor", "info"),
+    ("check skipped", "info"),
+    ("nothing needs", "ok"),
+)
+
+
+def item_kind(title: str) -> str:
+    """What sort of finding this is, so the Triage agent can explain its ranking."""
+    low = title.lower()
+    return next((kind for needle, kind in _KIND_RULES if needle in low), "info")
+
+
 def attention_items(s: dict[str, Any]) -> list[dict[str, str]]:
     """Plain-language, prioritised actions. Pure, so snapshots and tests get the same answer."""
     items: list[dict[str, str]] = []
 
     def add(level: str, title: str, detail: str, action: str = "") -> None:
-        items.append({"level": level, "title": title, "detail": detail, "action": action})
+        items.append(
+            {"level": level, "title": title, "detail": detail, "action": action,
+             "kind": item_kind(title)}
+        )  # fmt: skip
 
     agent = s.get("agent") or {}
     health = agent.get("health", "never")
@@ -265,7 +293,17 @@ def build_summary(now: float | None = None) -> dict[str, Any]:
         "explain": EXPLAIN,
     }
     summary["attention"] = attention_items(summary)
+    summary["agents"] = run_agents(summary, _rule_titles(rules))
     return summary
+
+
+def _rule_titles(rules: list[Any]) -> dict[str, list[str]]:
+    """technique id -> titles of the rules that claim to cover it."""
+    out: dict[str, list[str]] = {}
+    for rule in rules:
+        for tid in rule.technique_ids:
+            out.setdefault(tid, []).append(rule.title)
+    return out
 
 
 def demo_summary() -> dict[str, Any]:
@@ -372,6 +410,10 @@ def demo_summary() -> dict[str, Any]:
         "explain": EXPLAIN,
     }
     summary["attention"] = attention_items(summary)
+    summary["agents"] = run_agents(
+        summary,
+        {"T1059.001": ["Suspicious Encoded PowerShell"], "T1082": ["System Information Discovery"]},
+    )
     return summary
 
 
