@@ -26,6 +26,9 @@ pip install .
 ptaf up
 ```
 
+Prefer one line? `pipx install git+https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework.git`
+(then `ptaf up`).
+
 `ptaf up` starts the agent **and** a live dashboard and opens your browser. The first safe tests run
 immediately; results appear in about ten seconds and the page then updates live. `Ctrl-C` stops everything
 cleanly. On **Kali Linux** use `./packaging/install-kali.sh` (it handles the PEP 668 restriction) and run
