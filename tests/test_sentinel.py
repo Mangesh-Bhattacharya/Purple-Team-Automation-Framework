@@ -487,3 +487,21 @@ def test_other_canaries_are_not_retried_on_no_telemetry(monkeypatch):
         validation.run_canary(core, [], collect_host_info(), EventBuffer()).status == "no_telemetry"
     )
     assert len(calls) == 1  # a sensor that sees nothing for a long-lived canary is a real problem
+
+
+def test_a_no_telemetry_result_says_whether_the_tool_ran_and_how_it_exited(monkeypatch):
+    """A tool that failed to start must be distinguishable from a blind sensor."""
+    import sys
+
+    from ptaf import canaries, validation
+    from ptaf.canaries import Canary
+
+    c = canaries.CANARIES[0]
+    quick = Canary(
+        id="q", technique_id="T1", name="q", tactic="x", platforms=(), description="",
+        build_argv=lambda m: [sys.executable, "-c", "import sys; sys.exit(7)"],
+        modeled_events=c.modeled_events,
+    )  # fmt: skip
+    # an empty buffer that never receives events: the sensor "sees nothing"
+    res = validation._run_canary_once(quick, [], collect_host_info(), EventBuffer(), settle=0.05)
+    assert res.status == "no_telemetry" and "exited with code 7" in res.detail

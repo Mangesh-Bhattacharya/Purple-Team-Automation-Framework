@@ -178,7 +178,12 @@ def _run_canary_once(
     base.events_observed = len(events)
     if not events:
         base.status = "no_telemetry"
-        base.detail = "collector observed no events for the canary (sensor gap)"
+        # Say whether the tool even ran: a tool that failed to start (exit 126/127, a library error)
+        # looks identical to a blind sensor unless the exit code is reported.
+        base.detail = (
+            "collector observed no events for the canary (sensor gap); "
+            f"the process exited with code {proc.returncode} after {base.duration_s}s"
+        )
         return base
 
     fired: list[str] = []
