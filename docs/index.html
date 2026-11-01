@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PTAF Sentinel: unit tests for your detection rules</title>
+<meta name="description" content="Open-source (MIT) beta tool that runs harmless imitations of attacker behavior and checks whether your Sigma rules catch them. Windows, macOS, Linux, Kali.">
+<meta property="og:title" content="PTAF Sentinel: unit tests for your detection rules">
+<meta property="og:description" content="Run harmless attacker-behavior tests and see which Sigma rules caught them. Open source, beta.">
+<style>
+:root{--bg:#140f0b;--card:#211812;--line:#5a4630;--tx:#f6efe6;--mut:#c9b79d;--amb:#f5a43c}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:17px/1.6 -apple-system,Segoe UI,Helvetica,Arial,sans-serif}
+main{max-width:900px;margin:0 auto;padding:0 22px 80px}
+header{padding:56px 0 24px}.logo{font:700 22px ui-monospace,Menlo,monospace}.logo i{color:var(--amb);font-style:normal}
+.tag{display:inline-block;border:1px solid var(--line);border-radius:30px;padding:3px 14px;font-size:14px;color:var(--mut);margin-left:10px}
+h1{font-size:clamp(34px,6vw,56px);line-height:1.1;margin:28px 0 14px}h2{margin:56px 0 12px;font-size:28px}h3{margin:0 0 6px;font-size:19px;color:var(--amb)}
+p{margin:0 0 14px;color:#e6dac8}a{color:var(--amb)}
+.btn{display:inline-block;background:var(--amb);color:#140f0b;font-weight:700;padding:12px 22px;border-radius:10px;text-decoration:none;margin:6px 10px 6px 0}
+.btn.alt{background:transparent;color:var(--amb);border:1px solid var(--amb)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+pre{background:#0d0906;border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto;font:14px/1.5 ui-monospace,Menlo,monospace;color:#f3e6d0}
+table{border-collapse:collapse;width:100%}td,th{border-bottom:1px solid var(--line);padding:10px 8px;text-align:left;vertical-align:top}th{color:var(--mut);font-weight:600}
+.note{border-left:3px solid var(--amb);padding:8px 14px;background:var(--card);border-radius:0 10px 10px 0;color:#e6dac8}
+footer{margin-top:60px;color:var(--mut);font-size:14px}
+</style></head><body><main>
+<header><span class="logo">PTAF Sentinel<i>_</i></span><span class="tag">open source · MIT · beta v0.2.0</span>
+<h1>Unit tests for your detection rules.</h1>
+<p>PTAF Sentinel runs harmless imitations of attacker behavior on a machine, runs your Sigma rules against that machine's own process telemetry, and tells you which behaviors were caught, missed, or newly stopped being caught.</p>
+<a class="btn" href="https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework">View on GitHub</a>
+<a class="btn alt" href="https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/releases/tag/v0.2.0">Download v0.2.0 (beta)</a>
+</header>
+
+<div class="grid">
+<div class="card"><h3>Find silent failures</h3><p>A rule that exists is not a rule that fires. Our own example rule had a doubled backslash and passed syntax checks for weeks while it could never match.</p></div>
+<div class="card"><h3>Rule gap or blind sensor?</h3><p>"Missed" and "no telemetry" are different statuses. <code>ptaf selftest</code> exits 0 (ok), 1 (gap or drift) or 3 (sensor problem), with JUnit output.</p></div>
+<div class="card"><h3>Bring your Sigma rules</h3><p><code>ptaf rules check &lt;dir&gt;</code> shows which of your rules PTAF can run. On public SigmaHQ process-creation rules, 1,304 of 1,383 (94%) are runnable. Runnable does not mean the rule is good.</p></div>
+</div>
+
+<h2>Try it</h2>
+<pre>git clone https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework.git
+cd Purple-Team-Automation-Framework
+python3 -m venv .venv &amp;&amp; . .venv/bin/activate
+pip install .
+ptaf up</pre>
+<p>It starts the agent and a live dashboard. In one measured run on macOS the server was up in about 1.9 s and first real results arrived in about 10.8 s. <code>ptaf canaries</code> lists exactly what will run (19 canaries, 21 rules today).</p>
+<p class="note">Use only on systems you own or are authorized to test. Its tests can trigger security alerts.</p>
+
+<h2>What has actually been verified</h2>
+<table><tr><th>Claim</th><th>Evidence</th></tr>
+<tr><td>Runs real canaries on Windows, macOS, Linux; Python 3.10 and 3.12</td><td>CI</td></tr>
+<tr><td>Works on real Kali Linux</td><td>kali-rolling container with installer</td></tr>
+<tr><td>Event-driven sensor on a real Linux kernel</td><td>9 of 9 canaries detected, including nmap, hydra, sqlmap, tcpdump</td></tr>
+<tr><td>Memory stays flat</td><td>+1.3 MB over 800 short-lived processes, measured locally</td></tr>
+<tr><td>In-browser Detection Lab matches the Python engine</td><td>494 rule/event pairs plus all shipped rules</td></tr>
+<tr><td>Test suite</td><td>235 automated tests; lint and security scan clean</td></tr></table>
+<p style="margin-top:14px">We list no customers, users, stars or testimonials, because we have none to claim.</p>
+
+<h2>Honest limits</h2>
+<ul>
+<li>Process-creation telemetry only; no network, file, registry or authentication rules yet.</li>
+<li>On Windows and macOS the sensor polls every 50 ms and can miss very short-lived processes.</li>
+<li>Tested on CI runners and one developer Mac, not on hardened or EDR-protected fleets, physical machines, ARM or NetHunter Kali.</li>
+<li>Release apps are unsigned, so expect OS warnings. English only; no central console yet.</li>
+<li>The five dashboard agents are rule-based, not an AI model.</li>
+<li>A pass means one harmless test was caught by one rule on that machine at that time. It is not a security guarantee, and PTAF does not replace your SIEM or EDR.</li>
+</ul>
+
+<h2>Pricing</h2>
+<p><b>The software is free</b> (MIT, no telemetry, no licence key). Optional paid help, in USD:</p>
+<table>
+<tr><td>Rules Health Check, written report from an export you send (no access to your systems)</td><td><b>$149</b></td><td><a href="https://buy.stripe.com/5kQ28s4wFagdcs96HedUY00">Buy</a></td></tr>
+<tr><td>Detection Assurance Assessment, up to 5 machines + a 60-minute call</td><td><b>$790</b></td><td><a href="https://buy.stripe.com/fZuaEY0gpcol8bTc1ydUY01">Buy</a></td></tr>
+<tr><td>Support, solo (up to 3 machines), best effort</td><td><b>$49</b>/mo</td><td><a href="https://buy.stripe.com/dRm28s7IRgEB2Rz2qYdUY02">Subscribe</a></td></tr>
+<tr><td>Support, team (up to 25 machines), best effort</td><td><b>$149</b>/mo</td><td><a href="https://buy.stripe.com/7sYfZi2oxagdeAh8PmdUY03">Subscribe</a></td></tr>
+<tr><td>Team workshop, 90 minutes, remote, up to 10 people</td><td><b>$390</b></td><td><a href="https://buy.stripe.com/5kQ5kE7IRgEBdwd0iQdUY04">Buy</a></td></tr></table>
+<p style="margin-top:14px">Beta software; reports are advice, not a guarantee. Taxes added where they apply. Details: <a href="https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/blob/main/docs/PRICING.md">PRICING.md</a>.</p>
+
+<footer>Built by <a href="https://mangesh-bhattacharya.github.io">Mangesh Bhattacharya</a> · <a href="https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/blob/main/TERMS.md">Terms</a> · <a href="https://github.com/Mangesh-Bhattacharya/Purple-Team-Automation-Framework/blob/main/PRIVACY.md">Privacy</a> · MIT licensed. Beta software. Use only on systems you own or are authorized to test.</footer>
+</main></body></html>
