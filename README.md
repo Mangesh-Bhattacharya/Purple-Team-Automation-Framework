@@ -105,6 +105,10 @@ with `sudo` for the event-driven sensor: see [docs/kali.md](docs/kali.md).
 [docs/kali.md](docs/kali.md) · [docs/sigmahq-coverage.md](docs/sigmahq-coverage.md) ·
 [CONTRIBUTING.md](CONTRIBUTING.md) · [CHANGELOG.md](CHANGELOG.md)
 
+## Pricing
+
+The software is free (MIT). Optional paid help (health check, assessment, support, workshop) is listed in [docs/PRICING.md](docs/PRICING.md), in USD.
+
 ## Roadmap (not built yet)
 
 Native Windows and macOS event sensors (Sysmon/ETW, Endpoint Security) · network and registry telemetry ·

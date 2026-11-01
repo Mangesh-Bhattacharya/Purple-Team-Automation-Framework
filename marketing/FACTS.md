@@ -7,7 +7,7 @@ line by line. If it is not here, it cannot be claimed. Last updated 2026-10-31.
 - F1  PTAF Sentinel runs harmless imitations of attacker behavior on a machine, runs Sigma rules against that
       machine's own process telemetry, and reports which behaviors were caught, missed, or newly stopped being caught.
 - F2  MIT-licensed, open source, Python. No telemetry; the agent makes no outbound network connections.
-- F3  Status: v0.2.0, **beta**. Not yet tagged/released; not on PyPI; release apps are unsigned.
+- F3  Status: v0.2.0, **beta**. Tagged v0.2.0 and published as a GitHub prerelease (Linux x86_64, macOS arm64, Windows x86_64 binaries + SHA256 checksums); not on PyPI; release apps are unsigned.
 
 ## Verified results
 - F10 CI runs the real canaries on Windows, macOS and Linux, Python 3.10 and 3.12.
@@ -41,6 +41,7 @@ summaries · token-protected dashboard · Kali installer and Kali-tool canaries 
 
 - F22 Shipped features are exactly the list above; verified in code: `CANARIES` has 19 entries and `ptaf/rules/` has 21 rule files; `ptaf canaries` lists what runs.
 - F23 README legal notice: "Use PTAF only on systems you own or are authorized to test. Its tests can trigger security alerts."
+- F25 Services are priced in USD in docs/PRICING.md ($149 / $790 / $49-149 per month / $390); the software stays free (MIT). Prices are untested starting points.
 - F24 README premise: detection rules fail silently; a quiet dashboard proves nothing. This is the project's stated premise, NOT a measured statistic about breaches.
 
 ## Limits that must be said (never omit when making broad claims)

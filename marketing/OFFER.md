@@ -1,5 +1,8 @@
 # Offer: earning revenue within 30 days from an MIT-licensed tool
 
+> **Pricing update (Oct 2026):** the public price list is `docs/PRICING.md` (USD, deliberately low: $149 / $790 / $49-149 per month / $390). The higher figures below were the first hypotheses and are superseded. The owner earns in CAD; at an assumed 1 USD = 1.35-1.40 CAD (check the real rate when invoicing, and the payment provider's fee) $149 is about C$200 and $790 about C$1,070. To reach a given CAD monthly target, divide it by about 1.37 and by the number of services you can deliver.
+
+
 **No revenue can be promised.** The ledger records no customers, users, downloads or stars, and no pricing is in effect [FACTS.md "NOT true"]. Everything below is a plan to test, not a forecast. All prices are **HYPOTHESES**.
 
 The tool itself stays free: MIT-licensed, open source [F2]. Anyone can run it without paying. What can be sold is the owner's time, judgment and a defined deliverable, not the software. It is a beta [F3], so every offer must state the limits [L1-L7].
