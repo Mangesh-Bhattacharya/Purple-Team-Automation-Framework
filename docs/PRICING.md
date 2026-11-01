@@ -21,7 +21,17 @@ You only pay if you want a person to help. All prices are in **US dollars**, and
 
 ## How to buy
 
-Open an issue titled **"Services"** or message the maintainer through the contact on the [author page](https://mangesh-bhattacharya.github.io). Payment links are being set up; until then, agree scope and price by email first, and pay by invoice.
+Pay securely with a card through Stripe. Prices are in USD.
+
+| Service | Buy |
+|---|---|
+| Rules Health Check, $149 | https://buy.stripe.com/5kQ28s4wFagdcs96HedUY00 |
+| Detection Assurance Assessment, $790 | https://buy.stripe.com/fZuaEY0gpcol8bTc1ydUY01 |
+| Support (Solo), $49/month | https://buy.stripe.com/dRm28s7IRgEB2Rz2qYdUY02 |
+| Support (Team), $149/month | https://buy.stripe.com/7sYfZi2oxagdeAh8PmdUY03 |
+| Team workshop, $390 | https://buy.stripe.com/5kQ5kE7IRgEBdwd0iQdUY04 |
+
+After you pay, I will email you within 2 business days to agree scope and, for client work, written authorization. Questions first? Open a GitHub issue titled **"Services"**.
 
 ## Why these numbers
 
